@@ -1,0 +1,330 @@
+# Сценарии за ръчни тестове във Visual Studio: „Send request“ над всяка заявка, по ред.
+# Очакваният код е написан над всяка заявка. Сменете порта, ако е различен.
+# Демо потребители (DbSeeder): maria@ / petar@ (Client), ivan@ / georgi@ / nikola@ (Technician),
+# admin@itspec.local / Admin123!. Паролата на демо потребителите е Demo123!
+
+@HostAddress = https://localhost:7095
+@Api = {{HostAddress}}/api/v1
+
+### ====================== ВХОД ======================
+
+### 1. Вход като клиент Мария -> 200 + token
+# @name loginMaria
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "maria@itspec.local", "password": "Demo123!" }
+
+### 2. Вход като техник Иван (Лаптоп, Настолен компютър) -> 200
+# @name loginIvan
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "ivan@itspec.local", "password": "Demo123!" }
+
+### 3. Вход като техник Никола (Лаптоп, Смартфон, Принтер, Рутер) -> 200
+# @name loginNikola
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "nikola@itspec.local", "password": "Demo123!" }
+
+### 4. Вход като техник Георги (Смартфон, Таблет) -> 200
+# @name loginGeorgi
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "georgi@itspec.local", "password": "Demo123!" }
+
+### 5. Вход като Петър (друг клиент) -> 200
+# @name loginPetar
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "petar@itspec.local", "password": "Demo123!" }
+
+### 6. Вход като администратор -> 200
+# @name loginAdmin
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@itspec.local", "password": "Admin123!" }
+
+@maria = {{loginMaria.response.body.$.token}}
+@ivan = {{loginIvan.response.body.$.token}}
+@nikola = {{loginNikola.response.body.$.token}}
+@georgi = {{loginGeorgi.response.body.$.token}}
+@petar = {{loginPetar.response.body.$.token}}
+@admin = {{loginAdmin.response.body.$.token}}
+
+### 7. Грешна парола -> 401
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "maria@itspec.local", "password": "greshna" }
+
+### 8. /me без токен -> 401
+GET {{Api}}/auth/me
+
+### 9. /me с токен -> 200
+GET {{Api}}/auth/me
+Authorization: Bearer {{maria}}
+
+### ====================== РЕГИСТРАЦИЯ ======================
+
+### 10. Регистрация с "role": "Admin" в тялото -> 201, но ролята е Client (полето се игнорира)
+POST {{Api}}/auth/register/client
+Content-Type: application/json
+
+{ "fullName": "Тест Клиент", "email": "test-client-{{$randomInt 1000 9999}}@itspec.local", "password": "Test123!", "phone": "0899000000", "city": "Враца", "role": "Admin" }
+
+### 11. Втора регистрация със същия имейл -> 409
+POST {{Api}}/auth/register/client
+Content-Type: application/json
+
+{ "fullName": "Мария 2", "email": "maria@itspec.local", "password": "Test123!", "phone": "0899000000", "city": "Враца" }
+
+### 12. Невалиден телефон -> 400
+POST {{Api}}/auth/register/technician
+Content-Type: application/json
+
+{ "fullName": "Тест Техник", "email": "t@itspec.local", "password": "Test123!", "phone": "abc", "city": "Враца" }
+
+### ====================== ЗАЯВКИ ======================
+
+### 13. Нова заявка от клиент (Лаптоп) -> 201
+# @name newRequest
+POST {{Api}}/requests
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 1, "title": "Не се включва след ъпдейт", "description": "След ъпдейт на Windows лаптопът стои на черен екран.", "deviceModel": "HP 250 G8" }
+
+@requestId = {{newRequest.response.body.$.supportRequestId}}
+
+### 14. Нова заявка от техник -> 403
+POST {{Api}}/requests
+Authorization: Bearer {{ivan}}
+Content-Type: application/json
+
+{ "deviceTypeId": 1, "title": "Опит от техник", "description": "Техникът не може да публикува заявки." }
+
+### 15. Нова заявка без токен -> 401
+POST {{Api}}/requests
+Content-Type: application/json
+
+{ "deviceTypeId": 1, "title": "Без токен", "description": "Без токен не става." }
+
+### 16. Списък на клиента (само своите) -> 200
+GET {{Api}}/requests
+Authorization: Bearer {{maria}}
+
+### 17. Списък на техник Иван (отворените за Лаптоп и Настолен компютър) -> 200
+GET {{Api}}/requests
+Authorization: Bearer {{ivan}}
+
+### 18. Детайли преди приемане: clientPhone и clientAddress са null -> 200
+GET {{Api}}/requests/{{requestId}}
+Authorization: Bearer {{ivan}}
+
+### ====================== ОФЕРТИ ======================
+
+### 19. Оферта от Иван (Лаптоп е негов вид) -> 201
+# @name offerIvan
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{ivan}}
+Content-Type: application/json
+
+{ "price": 60, "message": "Ще преинсталирам драйверите, гаранция 1 месец." }
+
+### 20. Втора оферта от Иван по същата заявка -> 409
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{ivan}}
+Content-Type: application/json
+
+{ "price": 50 }
+
+### 21. Оферта от Никола -> 201
+# @name offerNikola
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{nikola}}
+Content-Type: application/json
+
+{ "price": 45, "message": "Мога утре." }
+
+### 22. Оферта от Георги (Лаптоп НЕ е негов вид) -> 403
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{georgi}}
+Content-Type: application/json
+
+{ "price": 40 }
+
+### 23. Оферта от клиент -> 403
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "price": 40 }
+
+### 24. Офертите по заявката от собственика -> 200
+GET {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{maria}}
+
+### 25. Офертите по чужда заявка (Петър) -> 403
+GET {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{petar}}
+
+### 26. Приемане на оферта по ЧУЖДА заявка (Петър) -> 409, нищо не се променя
+POST {{Api}}/offers/{{offerIvan.response.body.$.offerId}}/accept
+Authorization: Bearer {{petar}}
+
+### 27. Приемане от техник -> 403
+POST {{Api}}/offers/{{offerIvan.response.body.$.offerId}}/accept
+Authorization: Bearer {{ivan}}
+
+### 28. Приемане без токен -> 401
+POST {{Api}}/offers/{{offerIvan.response.body.$.offerId}}/accept
+
+### 29. Приемане на офертата на Иван от собственика -> 200, заявката е Assigned
+POST {{Api}}/offers/{{offerIvan.response.body.$.offerId}}/accept
+Authorization: Bearer {{maria}}
+
+### 30. Втора приета оферта по същата заявка -> 409
+POST {{Api}}/offers/{{offerNikola.response.body.$.offerId}}/accept
+Authorization: Bearer {{maria}}
+
+### 31. Оферта по заявка, която вече е Assigned -> 409
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{nikola}}
+Content-Type: application/json
+
+{ "price": 30 }
+
+### 32. Детайли за Иван (приетият техник): clientPhone и clientAddress са попълнени -> 200
+GET {{Api}}/requests/{{requestId}}
+Authorization: Bearer {{ivan}}
+
+### 33. Детайли за Никола (офертата му е отхвърлена): clientPhone и clientAddress са null -> 200
+GET {{Api}}/requests/{{requestId}}
+Authorization: Bearer {{nikola}}
+
+### ====================== ЗАВЪРШВАНЕ И ОТЗИВ ======================
+
+### 34. Отзив преди завършване -> 409
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "rating": 5, "comment": "Твърде рано" }
+
+### 35. Завършване от Никола (не е приетият техник) -> 403
+POST {{Api}}/requests/{{requestId}}/complete
+Authorization: Bearer {{nikola}}
+
+### 36. Завършване от Иван -> 204
+POST {{Api}}/requests/{{requestId}}/complete
+Authorization: Bearer {{ivan}}
+
+### 37. Отзив с оценка 7 -> 400
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "rating": 7 }
+
+### 38. Отзив от Петър (чужда заявка) -> 409
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{petar}}
+Content-Type: application/json
+
+{ "rating": 1 }
+
+### 39. Отзив от собственика -> 201, рейтингът на Иван се обновява
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "rating": 5, "comment": "Бързо и професионално." }
+
+### 40. Втори отзив -> 409
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "rating": 4 }
+
+### 41. Профилът на техниците (рейтинг от изгледа) -> 200
+GET {{Api}}/technicians
+
+### ====================== ПРЕКРАТЯВАНЕ ======================
+
+### 42. Нова заявка за прекратяване -> 201
+# @name toCancel
+POST {{Api}}/requests
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 5, "title": "Принтерът не печата", "description": "Принтерът показва грешка E3 и не печата." }
+
+### 43. Прекратяване от Петър (чужда) -> 403
+POST {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}/cancel
+Authorization: Bearer {{petar}}
+
+### 44. Прекратяване от собственика -> 204
+POST {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}/cancel
+Authorization: Bearer {{maria}}
+
+### 45. Второ прекратяване -> 409
+POST {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}/cancel
+Authorization: Bearer {{maria}}
+
+### ====================== ВИДОВЕ УСТРОЙСТВА ======================
+
+### 46. Публичен списък -> 200
+GET {{Api}}/device-types
+
+### 47. Нов вид от клиент -> 403
+POST {{Api}}/device-types
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "name": "Смарт часовник" }
+
+### 48. Нов вид от админ -> 201
+POST {{Api}}/device-types
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "name": "Смарт часовник {{$randomInt 100 999}}" }
+
+### 49. Георги сменя видовете си: Смартфон, Таблет, Лаптоп -> 204
+PUT {{Api}}/technicians/me/device-types
+Authorization: Bearer {{georgi}}
+Content-Type: application/json
+
+{ "deviceTypeIds": [3, 4, 1] }
+
+### 50. Списък с несъществуващ вид -> 409, старите видове остават
+PUT {{Api}}/technicians/me/device-types
+Authorization: Bearer {{georgi}}
+Content-Type: application/json
+
+{ "deviceTypeIds": [3, 999] }
+
+### 51. Видовете на Георги -> 200 [1, 3, 4]
+GET {{Api}}/technicians/me/device-types
+Authorization: Bearer {{georgi}}
+
+### ====================== АДМИН ======================
+
+### 52. Потребители от админ -> 200
+GET {{Api}}/admin/users
+Authorization: Bearer {{admin}}
+
+### 53. Потребители от техник -> 403
+GET {{Api}}/admin/users
+Authorization: Bearer {{ivan}}
+
+### 54. Статистика -> 200
+GET {{Api}}/admin/stats
+Authorization: Bearer {{admin}}
