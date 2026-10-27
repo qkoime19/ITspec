@@ -26,6 +26,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Offer> Offers => Set<Offer>();
     public DbSet<Review> Reviews => Set<Review>();
 
+    // Изгледите се създават от миграцията SqlObjects; EF само чете от тях.
+    public DbSet<OpenSupportRequestView> OpenSupportRequests => Set<OpenSupportRequestView>();
+    public DbSet<TechnicianProfileView> TechnicianProfiles => Set<TechnicianProfileView>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureUsers(modelBuilder);
@@ -34,6 +38,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureSupportRequests(modelBuilder);
         ConfigureOffers(modelBuilder);
         ConfigureReviews(modelBuilder);
+        ConfigureViews(modelBuilder);
         SeedData(modelBuilder);
     }
 
@@ -232,6 +237,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithOne(q => q.Review)
                 .HasForeignKey<Review>(r => r.SupportRequestId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Изгледи — четат се като таблици без ключ.
+    // ToView казва на EF да чете от изгледа и да НЕ го създава в миграцията.
+    // ------------------------------------------------------------------
+    private static void ConfigureViews(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OpenSupportRequestView>(e =>
+        {
+            e.HasNoKey();
+            e.ToView("vw_OpenSupportRequests");
+        });
+
+        modelBuilder.Entity<TechnicianProfileView>(e =>
+        {
+            e.HasNoKey();
+            e.ToView("vw_TechnicianProfiles");
+            e.Property(p => p.AvgRating).HasPrecision(3, 2);
         });
     }
 
