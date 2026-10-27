@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/backend/">
     <Project Path="backend/ITspec.Api/ITspec.Api.csproj" />
+    <Project Path="backend/ITspec.Tests/ITspec.Tests.csproj" />
   </Folder>
+  <Folder Name="/frontend/" />
 </Solution>

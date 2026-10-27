@@ -4,12 +4,77 @@
 
 > Учебна практика: Интернет програмиране, 12 клас · Тема 8 от 12 · **Александър Калоянов**
 
-## Спецификация (стъпки 1–5)
+## Технологии
+
+| Част | Технология |
+| --- | --- |
+| Back-end | ASP.NET Core Web API (.NET 10) |
+| Достъп до данни | EF Core, Code First — таблиците се създават от C# класовете с миграции, без SSMS |
+| База данни | MS SQL Server (LocalDB) |
+| Сигурност | JWT токени и роли |
+| Документация и ръчни тестове | Swagger, `.http` файл |
+| Front-end | чист HTML, CSS и JavaScript (`fetch`) в `wwwroot` |
+
+## Роли
+
+| Роля | Прави | Вижда |
+| --- | --- | --- |
+| **Client** | публикува заявки; приема една оферта по своя заявка; прекратява своя заявка; оставя отзив след завършване | своите заявки и офертите по тях |
+| **Technician** | избира с кои видове устройства работи; дава оферти по отворени заявки в тях; завършва работата по приетата си оферта | отворените заявки в своите видове; **адреса и телефона на клиента — само след като неговата оферта е приета** |
+| **Admin** | управлява видовете устройства; блокира потребители | всички заявки, оферти и отзиви; статистика |
+
+## Жизнен цикъл на заявката
+
+```
+  Open ──приема оферта (Client)──► Assigned ──завършва (приетият Technician)──► Completed ──► отзив
+    │                                 │
+    └──────── прекратява (Client) ────┴──► Cancelled
+```
+
+## Собствено правило
+
+**Техник не може да има повече от 3 поети (Assigned) заявки едновременно.** Пази се в процедурата `usp_AcceptOffer`, в транзакцията на приемането, със заключване на реда на техника — така двама клиенти не могат едновременно да му дадат четвърта поръчка. Подробно: [`docs/03-rules.md`](docs/03-rules.md).
+
+## Структура
+
+```
+Алекс/
+├── Алекс.slnx
+├── README.md
+├── backend/
+│   ├── ITspec.Api/
+│   │   ├── Controllers/        C: Auth, DeviceTypes, Requests, Offers, Technicians, Admin
+│   │   ├── Model/
+│   │   │   ├── Entities/       класовете за таблиците (Code First)
+│   │   │   ├── Data/           AppDbContext, DbSeeder, Migrations, Sql/SqlObjects.cs
+│   │   │   └── Services/       бизнес логиката
+│   │   ├── View/DTOs/          какво влиза и излиза от API-то (никога Entity)
+│   │   ├── Infrastructure/     Auth (JWT), Errors (ProblemDetails), OpenApi (Authorize в Swagger)
+│   │   ├── wwwroot/            front-end: HTML, CSS, js/api.js, js/pages/
+│   │   └── ITspec.Api.http     54 сценария за ръчни тестове
+│   ├── ITspec.Tests/
+│   └── Database/               SQL скриптове: процедури, тестови данни, 19 теста
+└── docs/                       спецификация 01–05 и тестова матрица
+```
+
+## Стартиране
+
+Пълните стъпки са в [`backend/README.md`](backend/README.md). Накратко:
+
+1. Отворете `Алекс.slnx` във Visual Studio.
+2. Ctrl+F5 (профил https). При първото пускане миграциите `InitialCreate` и `SqlObjects` създават базата сами.
+3. Сайтът е на `https://localhost:7095/`, Swagger — на `/swagger`.
+
+JWT ключът е в `appsettings.Local.json` (извън Git). На друг компютър — вижте `backend/README.md`, стъпка 2.
+
+## Документация
 
 | Файл | Съдържание |
 | --- | --- |
 | [`docs/01-requirements.md`](docs/01-requirements.md) | проблем, роли, потребителски истории |
 | [`docs/02-tables.md`](docs/02-tables.md) | таблици, връзки, решения |
-| [`docs/03-rules.md`](docs/03-rules.md) | бизнес правила и собственото правило |
+| [`docs/03-rules.md`](docs/03-rules.md) | бизнес правила: къде се пази всяко и защо; собственото правило |
 | [`docs/04-api.md`](docs/04-api.md) | API договор |
 | [`docs/05-screens.md`](docs/05-screens.md) | екрани и данните им |
+| [`docs/test-matrix.md`](docs/test-matrix.md) | тестова матрица |
+| [`backend/Database/README.md`](backend/Database/README.md) | SQL скриптове и номерата на грешките |
