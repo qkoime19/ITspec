@@ -1,0 +1,22 @@
+# .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+
+# Node / React
+node_modules/
+dist/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Локални настройки с тайни (Jwt:Key)
+appsettings.Local.json
+
+# Стари папки от първите опити (не са част от проекта)
+/ITspec.Api/
+/frontend/
