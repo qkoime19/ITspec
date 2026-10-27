@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Регистрация — ITspec</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <header id="nav"></header>
+  <main>
+    <h1>Регистрация</h1>
+    <div id="message"></div>
+    <form class="form-card" id="register-form" novalidate>
+      <div class="radio-row" role="radiogroup" aria-label="Регистрирам се като">
+        <label><input type="radio" name="kind" value="client" checked> Клиент</label>
+        <label><input type="radio" name="kind" value="technician"> Техник</label>
+      </div>
+      <label>Име и фамилия <input name="fullName" required></label>
+      <label>Имейл <input name="email" type="email" required autocomplete="username"></label>
+      <label>Парола <input name="password" type="password" required minlength="6" autocomplete="new-password"></label>
+      <label>Телефон <input name="phone" required placeholder="0888123456"></label>
+      <label>Град <input name="city" required></label>
+      <label>Адрес <input name="address" placeholder="Вижда го само техникът с приетата оферта"></label>
+      <button type="submit">Регистрация</button>
+    </form>
+  </main>
+  <script type="module" src="/js/pages/register.js"></script>
+</body>
+</html>

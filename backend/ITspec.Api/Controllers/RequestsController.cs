@@ -23,6 +23,18 @@ public class RequestsController(RequestService requests, OfferService offers) : 
         return Ok(await requests.GetListAsync(User.GetUserId(), User.GetRole()));
     }
 
+    /// <summary>
+    /// Публичните обяви (отворените заявки) за началната страница. Без вход.
+    /// Пример: GET /api/v1/requests/open?deviceTypeId=1&amp;city=Враца&amp;search=екран
+    /// </summary>
+    [HttpGet("open")]
+    [AllowAnonymous]
+    public async Task<ActionResult<List<RequestListItemDto>>> GetOpen(
+        [FromQuery] int? deviceTypeId, [FromQuery] string? city, [FromQuery] string? search)
+    {
+        return Ok(await requests.GetOpenPublicAsync(deviceTypeId, city, search));
+    }
+
     /// <summary>Детайли. 200 / 403 / 404.</summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<RequestDetailsDto>> GetById(int id)

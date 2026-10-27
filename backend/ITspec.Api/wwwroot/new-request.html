@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Нова заявка — ITspec</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <header id="nav"></header>
+  <main>
+    <h1>Публикувай заявка</h1>
+    <p class="muted">Опишете проблема. Техниците, които работят с този вид устройства, ще ви изпратят оферти.</p>
+    <div id="message"></div>
+    <form class="form-card" id="request-form" novalidate>
+      <label>Вид устройство <select name="deviceTypeId" required></select></label>
+      <label>Заглавие <input name="title" required maxlength="120" placeholder="напр. Лаптопът не зарежда"></label>
+      <label>Описание на проблема <textarea name="description" required maxlength="2000"></textarea></label>
+      <label>Марка и модел <input name="deviceModel" maxlength="100" placeholder="напр. Lenovo IdeaPad 5"></label>
+      <label>Град <input name="city" maxlength="60" placeholder="ако е празно — вашият град"></label>
+      <label>Удобна дата <input name="preferredDate" type="date"></label>
+      <button type="submit">Публикувай</button>
+    </form>
+  </main>
+  <script type="module" src="/js/pages/new-request.js"></script>
+</body>
+</html>

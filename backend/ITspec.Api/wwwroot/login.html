@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход — ITspec</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <header id="nav"></header>
+  <main>
+    <h1>Вход</h1>
+    <div id="message"></div>
+    <form class="form-card" id="login-form" novalidate>
+      <label>Имейл <input name="email" type="email" required autocomplete="username"></label>
+      <label>Парола <input name="password" type="password" required autocomplete="current-password"></label>
+      <button type="submit">Вход</button>
+    </form>
+    <p class="muted">Нямате акаунт? <a href="/register.html">Регистрация</a></p>
+  </main>
+  <script type="module" src="/js/pages/login.js"></script>
+</body>
+</html>

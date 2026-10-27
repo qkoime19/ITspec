@@ -1,10 +1,10 @@
 # 5. Екрани
 
-Front-end-ът е чист HTML, CSS и JavaScript (`fetch`) в `backend/ITspec.Api/wwwroot`. Всички заявки минават през `js/api.js`, който добавя JWT и връща към входа при 401.
+Сайтът е подреден като сайт за обяви: заявките са „обяви за работа“, които техниците разглеждат, а клиентите публикуват с бутона „+ Публикувай заявка“. Front-end-ът е чист HTML, CSS и JavaScript (`fetch`) в `backend/ITspec.Api/wwwroot`. Всички заявки минават през `js/api.js`, който добавя JWT и връща към входа при 401.
 
 | Екран | Файл | Роля | Данни от |
 | --- | --- | --- | --- |
-| Начало | index.html | всички | GET /device-types, GET /technicians |
+| Начало — дъска с обяви (търсачка, категории с брой обяви, списък, най-добри техници) | index.html | всички, без вход | GET /requests/open с филтри, GET /device-types, GET /technicians |
 | Вход | login.html | всички | POST /auth/login |
 | Регистрация | register.html | всички | POST /auth/register/client или /technician |
 | Списък със заявки | requests.html | Client, Technician, Admin | GET /requests (различен според ролята) |

@@ -12,6 +12,7 @@
 | POST /device-types | Admin | 201 | 400, 401, 403, 409 |
 | PUT /device-types/{id} | Admin | 204 | 400, 401, 403, 404, 409 |
 | DELETE /device-types/{id} | Admin | 204 (IsActive = false) | 401, 403, 404 |
+| GET /requests/open?deviceTypeId=&city=&search= | всички (без вход) | 200 — публичните обяви от vw_OpenSupportRequests, без контакти | — |
 | GET /requests | логнат | 200 (според ролята) | 401 |
 | GET /requests/{id} | собственик / техник с оферта или от вида / Admin | 200 | 401, 403, 404 |
 | POST /requests | Client | 201 + Location | 400, 401, 403 |

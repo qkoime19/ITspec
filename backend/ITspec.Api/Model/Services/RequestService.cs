@@ -54,6 +54,43 @@ public class RequestService(AppDbContext db)
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Публичната „дъска с обяви“: отворените заявки от изгледа vw_OpenSupportRequests,
+    /// с филтри по вид устройство, град и текст. Вижда се и без вход.
+    /// Изгледът няма адрес и телефон, затова тук скритите данни не могат да излязат.
+    /// </summary>
+    public async Task<List<RequestListItemDto>> GetOpenPublicAsync(int? deviceTypeId, string? city, string? search)
+    {
+        var query = db.OpenSupportRequests.AsQueryable();
+
+        if (deviceTypeId is not null)
+        {
+            query = query.Where(v => v.DeviceTypeId == deviceTypeId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            var c = city.Trim();
+            query = query.Where(v => v.City.Contains(c));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var text = search.Trim();
+            query = query.Where(v => v.Title.Contains(text)
+                                     || v.Description.Contains(text)
+                                     || (v.DeviceModel != null && v.DeviceModel.Contains(text)));
+        }
+
+        return await query
+            .OrderByDescending(v => v.CreatedAt)
+            .Take(100)
+            .Select(v => new RequestListItemDto(
+                v.SupportRequestId, v.Title, v.DeviceTypeName, v.DeviceModel, v.City, v.PreferredDate,
+                RequestStatus.Open, v.CreatedAt, v.OffersCount, v.ClientName))
+            .ToListAsync();
+    }
+
     public async Task<RequestDetailsDto> GetDetailsAsync(int id, int userId, string role)
     {
         var request = await db.SupportRequests

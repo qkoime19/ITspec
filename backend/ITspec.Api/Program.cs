@@ -92,9 +92,27 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Front-end-ът (чист HTML, CSS и JavaScript) е в wwwroot: един проект, един адрес, без CORS.
+app.UseDefaultFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    // В Development браузърът винаги пита за нова версия на HTML/CSS/JS,
+    // за да не показва старата версия на сайта от кеша след промяна.
+    OnPrepareResponse = ctx =>
+    {
+        if (app.Environment.IsDevelopment())
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-cache";
+        }
+    }
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Бонус React: build-ът е в wwwroot/app. Опресняване на /app/requests/5 връща index.html, а не 404.
+app.MapFallbackToFile("/app/{*path:nonfile}", "app/index.html");
 
 app.Run();
