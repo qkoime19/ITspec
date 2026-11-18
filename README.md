@@ -473,3 +473,61 @@ Name е задължително, 2–60 символа (`[Required]`, `[StringL
 - AI предложи `AddScoped` още в 6б → **отхвърлих**: списъкът в паметта трябва да живее, докато работи приложението, затова `AddSingleton`. От стъпка 7 сервизът е `AddScoped`, защото `AppDbContext` живее колкото една HTTP заявка.
 
 ---
+
+
+## Стъпка 7 — модели и миграции
+
+### 1. Таблици и колони
+
+Подробно с типове и „Нужна за“ — в [Стъпка 2 — същности и връзки](#стъпка-2--същности-и-връзки). Класовете са в `Model/Entities`: `User`, `DeviceType`, `TechnicianDeviceType`, `SupportRequest`, `Offer`, `Review`, плюс enum-ите `RequestStatus` и `OfferStatus` и константите `Roles`.
+
+### 2. UNIQUE и CHECK от правилата (стъпка 3)
+
+| Правило | Таблица | Колони | Условие | Ред в `AppDbContext` |
+|---|---|---|---|---|
+| R1 | Users | Email | UNIQUE | `HasIndex(u => u.Email).IsUnique()` |
+| R2 | Users | Role | `Role IN ('Admin','Client','Technician')` | `HasCheckConstraint("CK_Users_Role", …)` |
+| — | Users | AvgRating | NULL или 1–5 | `CK_Users_AvgRating` |
+| — | DeviceTypes | Name | UNIQUE | `HasIndex(d => d.Name).IsUnique()` |
+| статуси | SupportRequests | Status | един от 4-те | `CK_SupportRequests_Status` |
+| R4 | Offers | SupportRequestId, TechnicianId | UNIQUE | `HasIndex(o => new { o.SupportRequestId, o.TechnicianId }).IsUnique()` |
+| R5 | Offers | SupportRequestId | UNIQUE WHERE Status = 'Accepted' | `UX_Offers_OneAccepted` с `HasFilter` |
+| — | Offers | Price | > 0 | `CK_Offers_Price` |
+| R8 | Reviews | SupportRequestId | UNIQUE | `HasIndex(r => r.SupportRequestId).IsUnique()` |
+| R8 | Reviews | Rating | 1–5 | `CK_Reviews_Rating` |
+
+### 3. Статуси (enum, записани като текст)
+
+- `RequestStatus`: Open, Assigned, Completed, Cancelled.
+- `OfferStatus`: Pending, Accepted, Rejected, Withdrawn.
+
+`HasConversion<string>()` — в базата се вижда `'Open'`, не `0`. Така процедурите и SSMS четат статуса без да знаят реда на enum-а, а пренареждане на enum-а не разваля данните.
+
+### 4. Начални данни (HasData)
+
+- 6 вида устройства: Лаптоп, Настолен компютър, Смартфон, Таблет, Принтер, Рутер и мрежа.
+- **Администраторът** (`admin@itspec.local`) — по изключение е тук, защото няма адрес за регистрация на Admin (R2). Хешът на паролата е **константа**, изчислена веднъж с `PasswordHasher`, затова всяка нова миграция не го променя.
+- Ролите нямат таблица — те са стойностите на CHECK.
+- Демо клиентите и техниците **не** са в HasData, а в `DbSeeder` (само в Development), защото хешът им се смята при старт.
+
+### 5. Ако някой изтрие потребител
+
+Всички връзки са с `DeleteBehavior.Restrict`: SQL Server отказва изтриване на потребител, който има заявки, оферти или видове устройства (грешка 547). Потребителите не се трият — блокират се (`IsBlocked`), за да останат историята, офертите и рейтингите.
+
+### Миграцията
+
+```
+Add-Migration InitialCreate -OutputDir Model/Data/Migrations
+Update-Database
+```
+
+Миграцията `20261021051350_InitialCreate` е в `Model/Data/Migrations`. В `Up` има `CreateTable` за 6-те таблици, `CreateIndex` за UNIQUE индексите и `CheckConstraint` за CHECK-овете; `Down` трие таблиците в обратен ред. `__EFMigrationsHistory` помни кои миграции са приложени. В Development `Program.cs` вика `MigrateAsync()` при старт — същото като `Update-Database`.
+
+### Решения
+
+- AI предложи `DeleteBehavior.Cascade` за офертите на заявка → **отхвърлих**: прекратена заявка трябва да пази офертите си; освен това Cascade по два пътя дава „multiple cascade paths“.
+- AI предложи статусът да е `int` → **отхвърлих** (точка 3).
+- AI предложи админът да е в DbSeeder като демо потребителите → **отхвърлих**: тогава в production нямаше да има админ. Приех HasData с константен хеш.
+- AI предложи колона UpdatedAt → **отхвърлих**: няма история за нея.
+
+---
