@@ -140,6 +140,51 @@ namespace ITspec.Api.Model.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ITspec.Api.Model.Entities.OpenSupportRequestView", b =>
+                {
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClientName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DeviceModel")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DeviceTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DeviceTypeName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("OffersCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("PreferredDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("SupportRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("vw_OpenSupportRequests", (string)null);
+                });
+
             modelBuilder.Entity("ITspec.Api.Model.Entities.Review", b =>
                 {
                     b.Property<int>("ReviewId")
@@ -247,6 +292,37 @@ namespace ITspec.Api.Model.Data.Migrations
                     b.HasIndex("DeviceTypeId");
 
                     b.ToTable("TechnicianDeviceTypes");
+                });
+
+            modelBuilder.Entity("ITspec.Api.Model.Entities.TechnicianProfileView", b =>
+                {
+                    b.Property<decimal?>("AvgRating")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("decimal(3,2)");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CompletedCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DeviceTypes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ReviewsCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TechnicianId")
+                        .HasColumnType("int");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("vw_TechnicianProfiles", (string)null);
                 });
 
             modelBuilder.Entity("ITspec.Api.Model.Entities.User", b =>
