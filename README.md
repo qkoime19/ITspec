@@ -73,3 +73,107 @@
 - AI посочи, че админът има само една история → **приех** и добавих U11 и U12, за да има поне 3 истории на роля.
 
 ---
+
+
+## Стъпка 2 — същности и връзки
+
+ER диаграмата е в [`docs/02-er-diagram.png`](docs/02-er-diagram.png). Таблиците се създават от C# класовете в `Model/Entities` с миграцията `InitialCreate` (Code First), не на ръка в SSMS.
+
+![ER диаграма](docs/02-er-diagram.png)
+
+### Таблици
+
+#### Users — всички потребители (клиент, техник, админ са една същност с различна роля)
+
+| Колона | Тип | Задължителна? | Нужна за |
+|---|---|---|---|
+| UserId | int, PK, IDENTITY | да | — |
+| Email | nvarchar(256), UNIQUE | да | U1, U6 (вход) |
+| PasswordHash | nvarchar(max) | да | U1, U6 |
+| FullName | nvarchar(100) | да | U2 (име на техника в офертата) |
+| Phone | nvarchar(20) | не | U9 |
+| Address | nvarchar(200) | не | U9 |
+| City | nvarchar(60) | да | U1 (градът на заявката по подразбиране), U7 |
+| Role | nvarchar(20), CHECK | да | всички (кой какво може) |
+| IsBlocked | bit, по подразбиране 0 | да | U11 |
+| AvgRating | decimal(3,2), CHECK 1–5 | не | U2 |
+| ReviewsCount | int, по подразбиране 0 | да | U2 |
+| CreatedAt | datetime2, от SQL Server | да | U12 |
+
+#### DeviceTypes — каталогът
+
+| Колона | Тип | Задължителна? | Нужна за |
+|---|---|---|---|
+| DeviceTypeId | int, PK | да | — |
+| Name | nvarchar(60), UNIQUE | да | U1, U6, U10 |
+| IsActive | bit | да | U10 (меко изтриване) |
+
+#### TechnicianDeviceTypes — връзката N:M
+
+| Колона | Тип | Задължителна? | Нужна за |
+|---|---|---|---|
+| TechnicianId | int, PK + FK → Users | да | U6, U7 |
+| DeviceTypeId | int, PK + FK → DeviceTypes | да | U6, U7 |
+
+#### SupportRequests — основният ресурс
+
+| Колона | Тип | Задължителна? | Нужна за |
+|---|---|---|---|
+| SupportRequestId | int, PK | да | — |
+| ClientId | int, FK → Users (собственик) | да | U1, U4 |
+| DeviceTypeId | int, FK → DeviceTypes | да | U1, U7 |
+| Title | nvarchar(120) | да | U1 |
+| Description | nvarchar(2000) | да | U1 |
+| DeviceModel | nvarchar(100) | не | U1, U7 |
+| City | nvarchar(60) | да | U7 |
+| PreferredDate | date | не | U1 |
+| Status | nvarchar(20), CHECK (Open, Assigned, Completed, Cancelled) | да | U3, U4, U9 |
+| CreatedAt | datetime2, от SQL Server | да | U7 (подредба) |
+
+#### Offers — ресурсът на втората роля
+
+| Колона | Тип | Задължителна? | Нужна за |
+|---|---|---|---|
+| OfferId | int, PK | да | — |
+| SupportRequestId | int, FK → SupportRequests | да | U7 |
+| TechnicianId | int, FK → Users | да | U7 |
+| Price | decimal(10,2), CHECK > 0 | да | U2 |
+| Message | nvarchar(1000) | не | U2 |
+| ProposedDate | date | не | U2 |
+| Status | nvarchar(20), CHECK (Pending, Accepted, Rejected, Withdrawn) | да | U3, U8 |
+| CreatedAt | datetime2 | да | U2 |
+
+UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportRequestId) WHERE Status = 'Accepted'.
+
+#### Reviews — завършващото действие
+
+| Колона | Тип | Задължителна? | Нужна за |
+|---|---|---|---|
+| ReviewId | int, PK | да | — |
+| SupportRequestId | int, FK, UNIQUE | да | U5 |
+| Rating | tinyint, CHECK 1–5 | да | U5, U2 |
+| Comment | nvarchar(1000) | не | U5 |
+| CreatedAt | datetime2 | да | U5 |
+
+### Връзки
+
+| Връзка | Вид | Как се превежда |
+|---|---|---|
+| Клиент → Заявки | 1:N | ClientId в SupportRequests |
+| Вид устройство → Заявки | 1:N | DeviceTypeId в SupportRequests |
+| Техници ↔ Видове устройства | N:M | междинна таблица TechnicianDeviceTypes със съставен ключ |
+| Заявка → Оферти | 1:N | SupportRequestId в Offers |
+| Техник → Оферти | 1:N | TechnicianId в Offers |
+| Заявка → Отзив | 1:0..1 | SupportRequestId в Reviews, уникален |
+
+### Решения
+
+- **Една таблица Users с колона Role, без таблица Roles.** Заданието на темата иска ролята като колона; трите стойности се пазят с CHECK. Отделни таблици за клиенти и техници биха дали два входа и две проверки за уникален имейл.
+- **Няма таблица „Работа“.** Приетата оферта вече казва кой, кога и за колко, а статусът на заявката — дали е завършена.
+- **Съзнателно дублиране:** AvgRating и ReviewsCount в Users може да се изчислят от отзивите, но се пазят, за да не се смятат при всяко търсене на техници. Цената е, че трябва да се обновяват — прави го `usp_AddReview` в същата транзакция, в която записва отзива.
+- **Няма каскадно изтриване.** Потребителите се блокират, видовете се деактивират, заявките се прекратяват — историята остава.
+- AI предложи колони UpdatedAt и IsDeleted във всички таблици → **отхвърлих**: нито една история не ги иска.
+- AI предложи таблица Roles като в демото → **отхвърлих** заради заданието (виж първата точка).
+- AI посочи, че за U9 трябва адрес на клиента → **приех** колоната Address в Users (по избор, защото не всеки клиент иска посещение).
+
+---
