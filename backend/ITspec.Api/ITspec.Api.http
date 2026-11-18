@@ -1,8 +1,94 @@
 # Сценарии за ръчни тестове във Visual Studio: „Send request“ над всяка заявка, по ред.
 # Очакваният код е написан над всяка заявка. Сменете порта, ако е различен.
+# Демо потребители (DbSeeder): maria@ / petar@ (Client), ivan@ / georgi@ / nikola@ (Technician),
+# admin@itspec.local / Admin123!. Паролата на демо потребителите е Demo123!
 
 @HostAddress = https://localhost:7095
 @Api = {{HostAddress}}/api/v1
+
+### ====================== ВХОД ======================
+
+### 1. Вход като клиент Мария -> 200 + token
+# @name loginMaria
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "maria@itspec.local", "password": "Demo123!" }
+
+### 2. Вход като техник Иван (Лаптоп, Настолен компютър) -> 200
+# @name loginIvan
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "ivan@itspec.local", "password": "Demo123!" }
+
+### 3. Вход като техник Никола (Лаптоп, Смартфон, Принтер, Рутер) -> 200
+# @name loginNikola
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "nikola@itspec.local", "password": "Demo123!" }
+
+### 4. Вход като техник Георги (Смартфон, Таблет) -> 200
+# @name loginGeorgi
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "georgi@itspec.local", "password": "Demo123!" }
+
+### 5. Вход като Петър (друг клиент) -> 200
+# @name loginPetar
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "petar@itspec.local", "password": "Demo123!" }
+
+### 6. Вход като администратор -> 200
+# @name loginAdmin
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@itspec.local", "password": "Admin123!" }
+
+@maria = {{loginMaria.response.body.$.token}}
+@ivan = {{loginIvan.response.body.$.token}}
+@nikola = {{loginNikola.response.body.$.token}}
+@georgi = {{loginGeorgi.response.body.$.token}}
+@petar = {{loginPetar.response.body.$.token}}
+@admin = {{loginAdmin.response.body.$.token}}
+
+### 7. Грешна парола -> 401
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "maria@itspec.local", "password": "greshna" }
+
+### 8. /me без токен -> 401
+GET {{Api}}/auth/me
+
+### 9. /me с токен -> 200
+GET {{Api}}/auth/me
+Authorization: Bearer {{maria}}
+
+### ====================== РЕГИСТРАЦИЯ ======================
+
+### 10. Регистрация с "role": "Admin" в тялото -> 201, но ролята е Client (полето се игнорира)
+POST {{Api}}/auth/register/client
+Content-Type: application/json
+
+{ "fullName": "Тест Клиент", "email": "test-client-{{$randomInt 1000 9999}}@itspec.local", "password": "Test123!", "phone": "0899000000", "city": "Враца", "role": "Admin" }
+
+### 11. Втора регистрация със същия имейл -> 409
+POST {{Api}}/auth/register/client
+Content-Type: application/json
+
+{ "fullName": "Мария 2", "email": "maria@itspec.local", "password": "Test123!", "phone": "0899000000", "city": "Враца" }
+
+### 12. Невалиден телефон -> 400
+POST {{Api}}/auth/register/technician
+Content-Type: application/json
+
+{ "fullName": "Тест Техник", "email": "t@itspec.local", "password": "Test123!", "phone": "abc", "city": "Враца" }
 
 ### ====================== ВИДОВЕ УСТРОЙСТВА (каталогът, без вход) ======================
 

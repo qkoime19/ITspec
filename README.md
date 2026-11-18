@@ -587,6 +587,75 @@ Update-Database
 
 ---
 
+
+## Стъпка 9 — вход, JWT и роли
+
+### 1. Роли × действия
+
+| Адрес | Публичен | Client | Technician | Admin | Собственик? |
+|---|---|---|---|---|---|
+| POST /auth/register/client, /technician, POST /auth/login | да | — | — | — | — |
+| GET /auth/me | — | да | да | да | себе си (от токена) |
+| GET /device-types, /device-types/{id} | да | да | да | да | — |
+| POST, PUT, DELETE /device-types | — | 403 | 403 | да | — |
+| GET /requests/open, GET /technicians, /technicians/{id} | да | да | да | да | — |
+| GET /requests, GET /api/v2/requests | — | своите | отворените в своите видове | всички | филтър по токена |
+| GET /requests/mine | — | да | 403 | 403 | да |
+| GET /requests/{id} | — | своята | с оферта или от вида | всички | да (иначе 404) |
+| POST /requests | — | да | 403 | 403 | става собственик |
+| PUT /requests/{id}, POST …/cancel, …/review | — | да | 403 | 403 | да |
+| GET /requests/{id}/offers | — | да | 403 | да | да |
+| POST /requests/{id}/offers, POST /offers/{id}/withdraw, GET /offers/mine | — | 403 | да | 403 | автор |
+| POST /offers/{id}/accept | — | да | 403 | 403 | собственик на заявката |
+| POST /requests/{id}/complete | — | 403 | да | 403 | приетият техник |
+| GET, PUT /technicians/me/profile, /me/device-types | — | 403 | да | 403 | себе си |
+| /admin/* | — | 403 | 403 | да | — |
+
+### 2. Токенът
+
+Съдържа само `sub` (UserId), `name`, `email`, `role` + `exp`, `iss`, `aud`. Подписан е с `Jwt:Key` (HMAC-SHA256), валиден 120 минути. **Няма** парола, хеш, телефон, адрес — данните в JWT се четат от всеки (jwt.io); подписът пази само от подправяне.
+
+### 3. Регистрация
+
+Сами се регистрират Client (`/auth/register/client`) и Technician (`/auth/register/technician`). Ролята идва от адреса, не от тялото — DTO-то няма поле Role, затова `"role": "Admin"` в тялото се игнорира (201 като Client). **Админът** се създава от миграцията (HasData), не може да се регистрира.
+
+### 4. Кодове при вход
+
+| Случай | Код | Съобщение |
+|---|---|---|
+| грешен имейл | 401 | „Грешен имейл или парола.“ |
+| грешна парола | 401 | същото |
+| блокиран | 403 | „Акаунтът е блокиран.“ |
+
+Съобщението за грешен имейл и грешна парола е еднакво, за да не може да се проверява кои имейли са регистрирани.
+
+### 5. Демо потребители (DbSeeder, само в Development)
+
+| Имейл | Роля |
+|---|---|
+| maria@itspec.local, petar@itspec.local | Client (двама — за теста „чужд запис → 404“) |
+| ivan@itspec.local, georgi@itspec.local, nikola@itspec.local | Technician |
+| admin@itspec.local | Admin (от миграцията, парола `Admin123!`) |
+
+Паролата на демо потребителите е от `appsettings.Development.json` (`Seed:DemoPassword` = `Demo123!`).
+
+### 6. Блокиран потребител със стар токен
+
+Токенът не може да се „отнеме“: блокиран потребител работи до изтичането му (най-много 120 минути). **Приемам риска** — срокът е кратък, а проверка в базата при всяка заявка би добавила SELECT към всяко действие. Входът на блокиран е забранен веднага (403).
+
+### Как изглежда в кода
+
+`Infrastructure/Auth/AuthClaims.cs` (имена на claims, `User.GetUserId()`, `User.GetRole()`), `JwtTokenService.cs` (издава токена), `Model/Services/AuthService.cs` (хеш с `PasswordHasher`, регистрация, вход), `Infrastructure/Errors/AppException.cs` и `ApiExceptionHandler.cs` (грешка → ProblemDetails: AppException → своя код; SQL 50001–50099 → 409, 50007 → 400; 2601/2627 → 409; 547 → 400; всичко друго → 500 без детайли). В `Program.cs`: `MapInboundClaims = false`, `RoleClaimType = role`, конвейерът `UseExceptionHandler → … → UseAuthentication → UseAuthorization → MapControllers`.
+
+### Решения
+
+- AI предложи ASP.NET Identity → **отхвърлих**: прави собствени таблици и роли, а заданието иска ролята като колона в Users.
+- AI предложи един адрес `/auth/register` с поле role и списък позволени роли → **отхвърлих**: два адреса са по-прости и полето просто не съществува; така тестът „регистрация като Admin“ дава 201 като Client, а не 400.
+- AI предложи телефона в токена, за да не се чете от базата → **отхвърлих** (точка 2).
+- AI предложи проверка `IsBlocked` при всяка заявка → **отхвърлих** засега (точка 6), записано е като известно ограничение.
+
+---
+
 ## SQL скриптове (backend/Database)
 
 Таблиците **не се пишат в SSMS**. Те се описват с C# класове (`Model/Entities`) и `AppDbContext`, а EF Core ги създава с миграции (Code First). Тук са SQL скриптовете за четене и проверка.
