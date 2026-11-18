@@ -250,3 +250,95 @@ UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportReque
 - AI предложи 403 за чужд запис → **отхвърлих** и избрах 404 навсякъде (R13): 404 не издава, че записът съществува. Изключение е приемането на оферта (R5): там проверката е вътре в процедурата и тя връща 409, защото тестовете на процедурата в SSMS очакват грешка 50002.
 
 ---
+
+
+## Стъпка 4 — API договор
+
+Текущият потребител винаги идва от JWT токена — нито един адрес и нито едно тяло не съдържа неговото Id. Статусът никога не се праща от клиента: всеки преход от [Стъпка 3 — бизнес правила](#стъпка-3--бизнес-правила) е отделен POST към под-адрес. Грешките са във формат ProblemDetails.
+
+**Кодове:** 200 четене или действие с отговор · 201 създадено (+ Location) · 204 успех без тяло · 400 невалидни данни · 401 не си влязъл · 403 грешна роля · 404 няма такъв запис **или е чужд** · 409 нарушено правило.
+
+### Endpoints
+
+| Метод и адрес | Роля | Успех | Възможни грешки (правило) | История |
+|---|---|---|---|---|
+| POST /auth/register/client | всички | 201 | 400, 409 (R1) | U1 |
+| POST /auth/register/technician | всички | 201 | 400, 409 (R1) | U6 |
+| POST /auth/login | всички | 200 + токен | 400, 401, 403 (R12) | U1, U6 |
+| GET /auth/me | логнат | 200 | 401 | U1, U6 |
+| GET /device-types | всички | 200 (само активните, с брой заявки) | — | U1, U6 |
+| GET /device-types/{id} | всички | 200 | 404 | U10 |
+| POST /device-types | Admin | 201 + Location | 400, 403, 409 (уникално име) | U10 |
+| PUT /device-types/{id} | Admin | 204 | 400, 403, 404, 409 | U10 |
+| DELETE /device-types/{id} | Admin | 204 (IsActive = false) | 403, 404 | U10 |
+| GET /requests/open?deviceTypeId=&city=&search= | всички, без вход | 200 (от `vw_OpenSupportRequests`) | — | U7 |
+| GET /requests | логнат | 200 (според ролята) — **остаряла**, виж v2 | 401 | U1, U7, U12 |
+| GET /requests/mine?status=&page= | Client | 200 (само своите, по 20) | 401, 403 | U1, U4 |
+| GET /requests/{id} | собственик / техник с оферта или от вида / Admin | 200 | 404 (R13) | U2, U9 |
+| POST /requests | Client | 201 + Location | 400 (неактивен вид) | U1 |
+| PUT /requests/{id} | Client (собственик) | 204 | 400, 404 (R13), 409 (R6) | U4 |
+| POST /requests/{id}/cancel | Client (собственик) | 204 | 404 (R13), 409 (R6) | U4 |
+| GET /requests/{id}/offers | Client (собственик), Admin | 200 | 404 (R13) | U2 |
+| POST /requests/{id}/offers | Technician | 201 | 400, 403 (R3), 404, 409 (R3, R4) | U7 |
+| GET /offers/mine | Technician | 200 | 403 | U7, U8 |
+| POST /offers/{id}/accept | Client (собственик) | 200 | 409 (R5, R10) | U3 |
+| POST /offers/{id}/withdraw | Technician (автор) | 204 | 404 (R13), 409 | U8 |
+| POST /requests/{id}/complete | Technician (приетата оферта) | 204 | 404 (R13), 409 (R7) | U9 |
+| POST /requests/{id}/review | Client (собственик) | 201 | 400 (R8), 409 (R8) | U5 |
+| GET /technicians?deviceTypeId=&city=&page= | всички, без вход | 200 (от `vw_TechnicianProfiles`) | — | U2 |
+| GET /technicians/{id} | всички | 200 + отзиви | 404 | U2 |
+| GET, PUT /technicians/me/profile | Technician | 200 / 204 | 400, 403 | U6, U9 |
+| GET, PUT /technicians/me/device-types | Technician | 200 / 204 | 403, 409 (R11) | U6 |
+| GET /admin/users?role=&blocked=&page= | Admin | 200 (без PasswordHash) | 401, 403 | U11 |
+| POST /admin/users/{id}/block, /unblock | Admin | 204 | 404, 409 (себе си / друг админ) | U11 |
+| GET /admin/requests?status=&page= | Admin | 200 | 403 | U12 |
+| GET /admin/stats | Admin | 200 | 403 | U12 |
+| GET **/api/v2**/requests?status=&deviceTypeId=&page=&pageSize= | логнат | 200 `{ items, page, pageSize, total }` | 401 | U1, U7, U12 |
+
+Всяко правило се вижда като код: R1 → 409 при регистрация; R3 → 403/409 при оферта; R4 → 409; R5, R10 → 409 при приемане; R6 → 409 при PUT и cancel; R7 → 409 при complete; R8 → 400/409 при отзив; R11 → 409; R12 → 403 при вход; R13 → 404.
+
+### Примери
+
+#### POST /auth/login
+
+Заявка:
+```json
+{ "email": "maria@itspec.local", "password": "Demo123!" }
+```
+Отговор 200 (без парола и без хеш):
+```json
+{ "token": "eyJ...", "expiresAt": "2026-11-18T14:00:00Z",
+  "user": { "userId": 2, "fullName": "Мария Иванова", "email": "maria@itspec.local", "city": "Враца", "role": "Client" } }
+```
+Грешка 401: `{ "title": "Грешен имейл или парола.", "status": 401 }` — еднакво за грешен имейл и грешна парола.
+
+#### POST /requests
+
+Заявка (няма clientId, status и createdAt — сървърът ги попълва):
+```json
+{ "deviceTypeId": 1, "title": "Лаптопът не зарежда",
+  "description": "Зарядното свети, но батерията стои на 0%.", "deviceModel": "Acer Aspire 5" }
+```
+Отговор `201 Created`, `Location: /api/v1/requests/7`, тялото е детайлите на заявката със `"status": "Open"`.
+Грешка 400: `{ "title": "Изберете съществуващ и активен вид устройство.", "status": 400 }`.
+
+#### POST /offers/12/accept
+
+Отговор 200:
+```json
+{ "offerId": 12, "supportRequestId": 7, "requestStatus": "Assigned" }
+```
+Грешка 409 (R10):
+```json
+{ "title": "Техникът вече има 3 поети заявки и не може да поеме нова. Изберете друга оферта.", "status": 409 }
+```
+
+### Решения
+
+- AI предложи `PATCH /requests/{id}` с `{"status": ...}` вместо отделни действия → **отхвърлих**: така клиентът решава статуса и проверката на преходите е на едно място за всички — лесно се пропуска случай. Всеки преход е отделен адрес (`/accept`, `/cancel`, `/complete`, `/withdraw`).
+- AI предложи 403 за чужд запис → **отхвърлих**, избрах 404 навсякъде (R13), за да не се издава, че записът съществува. Изключение: `/offers/{id}/accept` връща 409 от процедурата (виж [Стъпка 3 — бизнес правила](#стъпка-3--бизнес-правила)).
+- AI предложи `/users/{id}/requests` за „моите заявки“ → **отхвърлих**: Id-то щеше да е в адреса; направих `/requests/mine`, където собственикът е от токена.
+- AI посочи, че липсва адрес за публичното търсене на техници с филтри → **приех** `GET /technicians?deviceTypeId=&city=&page=`.
+- Междинната таблица TechnicianDeviceTypes не е ресурс: променя се изцяло през `PUT /technicians/me/device-types`.
+
+---
