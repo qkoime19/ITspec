@@ -1,47 +1,39 @@
+using ITspec.Api.Model.Data;
 using ITspec.Api.View.DTOs;
+using Microsoft.EntityFrameworkCore;
 
 namespace ITspec.Api.Model.Services;
 
 /// <summary>
-/// Стъпка 6б: каталогът (видове устройства) е списък в паметта — още няма база.
-/// Сервизът е моделът (M): не знае за HTTP. Ако записът липсва, връща null.
+/// Стъпка 7: същият сервиз, но чете от базата (EF Core). Контролерът почти не се промени.
 /// </summary>
-public class DeviceTypeService
+public class DeviceTypeService(AppDbContext db)
 {
-    private readonly List<DeviceTypeDto> _items =
-    [
-        new(1, "Лаптоп", true, 0),
-        new(2, "Смартфон", true, 0),
-        new(3, "Принтер", true, 0)
-    ];
-
-    private readonly Lock _lock = new();
-    private int _nextId = 4;
-
-    public List<DeviceTypeDto> GetAll()
+    /// <summary>Само активните, подредени по име. Броят заявки е в същата SQL заявка (проекция).</summary>
+    public async Task<List<DeviceTypeDto>> GetAllAsync()
     {
-        lock (_lock)
-        {
-            return _items.Where(d => d.IsActive).OrderBy(d => d.Name).ToList();
-        }
+        return await db.DeviceTypes
+            .Where(d => d.IsActive)
+            .OrderBy(d => d.Name)
+            .Select(d => new DeviceTypeDto(d.DeviceTypeId, d.Name, d.IsActive, d.SupportRequests.Count))
+            .ToListAsync();
     }
 
-    public DeviceTypeDto? GetById(int id)
+    public async Task<DeviceTypeDto?> GetByIdAsync(int id)
     {
-        lock (_lock)
-        {
-            return _items.SingleOrDefault(d => d.DeviceTypeId == id && d.IsActive);
-        }
+        return await db.DeviceTypes
+            .Where(d => d.DeviceTypeId == id && d.IsActive)
+            .Select(d => new DeviceTypeDto(d.DeviceTypeId, d.Name, d.IsActive, d.SupportRequests.Count))
+            .SingleOrDefaultAsync();
     }
 
-    public DeviceTypeDto Create(SaveDeviceTypeDto dto)
+    public async Task<DeviceTypeDto> CreateAsync(SaveDeviceTypeDto dto)
     {
-        lock (_lock)
-        {
-            // Id го дава сървърът, не клиентът.
-            var item = new DeviceTypeDto(_nextId++, dto.Name.Trim(), dto.IsActive, 0);
-            _items.Add(item);
-            return item;
-        }
+        var type = new Entities.DeviceType { Name = dto.Name.Trim(), IsActive = dto.IsActive };
+        db.DeviceTypes.Add(type);
+        await db.SaveChangesAsync();
+
+        // Id е 0 до SaveChangesAsync: стойността идва от IDENTITY колоната в базата.
+        return new DeviceTypeDto(type.DeviceTypeId, type.Name, type.IsActive, 0);
     }
 }

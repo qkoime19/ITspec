@@ -10,8 +10,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
 
 // ---------- Услуги ----------
-// Сервизът още е списък в паметта; в следващия commit чете от базата.
-builder.Services.AddSingleton<DeviceTypeService>();
+builder.Services.AddScoped<DeviceTypeService>();
 
 // ---------- Контролери и Swagger ----------
 builder.Services.AddControllers()
@@ -24,6 +23,11 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "ITspec API v1"));
+
+    // Прилага миграциите, които още не са в базата (същото като Update-Database).
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
 }
 
 app.UseHttpsRedirection();

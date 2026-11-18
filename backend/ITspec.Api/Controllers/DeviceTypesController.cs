@@ -14,24 +14,24 @@ public class DeviceTypesController(DeviceTypeService deviceTypes) : ControllerBa
 {
     /// <summary>Списък. 200.</summary>
     [HttpGet]
-    public ActionResult<List<DeviceTypeDto>> GetAll()
+    public async Task<ActionResult<List<DeviceTypeDto>>> GetAll()
     {
-        return Ok(deviceTypes.GetAll());
+        return Ok(await deviceTypes.GetAllAsync());
     }
 
     /// <summary>Един запис. 200 / 404.</summary>
     [HttpGet("{id:int}")]
-    public ActionResult<DeviceTypeDto> GetById(int id)
+    public async Task<ActionResult<DeviceTypeDto>> GetById(int id)
     {
-        var type = deviceTypes.GetById(id);
+        var type = await deviceTypes.GetByIdAsync(id);
         return type is null ? NotFound() : Ok(type);
     }
 
     /// <summary>Създаване. 201 + Location / 400.</summary>
     [HttpPost]
-    public ActionResult<DeviceTypeDto> Create(SaveDeviceTypeDto dto)
+    public async Task<ActionResult<DeviceTypeDto>> Create(SaveDeviceTypeDto dto)
     {
-        var created = deviceTypes.Create(dto);
+        var created = await deviceTypes.CreateAsync(dto);
         return CreatedAtAction(nameof(GetById), new { id = created.DeviceTypeId }, created);
     }
 }
