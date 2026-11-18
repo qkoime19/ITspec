@@ -272,6 +272,9 @@ Content-Type: application/json
 
 { "rating": 4 }
 
+### 41. Профилът на техниците (рейтинг от изгледа) -> 200
+GET {{Api}}/technicians
+
 ### ====================== ПРЕКРАТЯВАНЕ ======================
 
 ### 42. Нова заявка за прекратяване -> 201
@@ -429,6 +432,24 @@ Content-Type: application/json
 
 { "deviceTypeId": {{newType.response.body.$.deviceTypeId}}, "title": "Часовникът не се зарежда", "description": "Смарт часовникът не се зарежда от вчера." }
 
+### 49. Георги сменя видовете си: Смартфон, Таблет, Лаптоп -> 204
+PUT {{Api}}/technicians/me/device-types
+Authorization: Bearer {{georgi}}
+Content-Type: application/json
+
+{ "deviceTypeIds": [3, 4, 1] }
+
+### 50. Списък с несъществуващ вид -> 409, старите видове остават
+PUT {{Api}}/technicians/me/device-types
+Authorization: Bearer {{georgi}}
+Content-Type: application/json
+
+{ "deviceTypeIds": [3, 999] }
+
+### 51. Видовете на Георги -> 200 [1, 3, 4]
+GET {{Api}}/technicians/me/device-types
+Authorization: Bearer {{georgi}}
+
 ### ====================== МОИТЕ ЗАЯВКИ (10б) ======================
 
 ### 55. „Моите“ на Мария -> 200, само нейните, най-новите първи
@@ -452,3 +473,33 @@ Authorization: Bearer {{georgi}}
 ### 59. Оттегляне на отхвърлена оферта (Никола, след като е приета офертата на Иван) -> 409
 POST {{Api}}/offers/{{offerNikola.response.body.$.offerId}}/withdraw
 Authorization: Bearer {{nikola}}
+
+### ====================== ТЕХНИЦИ — ТЪРСЕНЕ И ПРОФИЛ (10г) ======================
+
+### 60. Търсене без токен, без филтри -> 200
+GET {{Api}}/technicians
+
+### 61. Търсене по вид устройство (Лаптоп) и град -> 200, само съвпадащите
+GET {{Api}}/technicians?deviceTypeId=1&city=Враца
+
+### 62. Моят профил (Иван) -> 200, без парола
+GET {{Api}}/technicians/me/profile
+Authorization: Bearer {{ivan}}
+
+### 63. Промяна на профила -> 204
+PUT {{Api}}/technicians/me/profile
+Authorization: Bearer {{ivan}}
+Content-Type: application/json
+
+{ "fullName": "Иван Петров", "phone": "0888123456", "city": "Враца" }
+
+### 64. Профил с невалиден телефон -> 400
+PUT {{Api}}/technicians/me/profile
+Authorization: Bearer {{ivan}}
+Content-Type: application/json
+
+{ "fullName": "Иван Петров", "phone": "abc", "city": "Враца" }
+
+### 65. Профил на техник от клиент -> 403
+GET {{Api}}/technicians/me/profile
+Authorization: Bearer {{maria}}

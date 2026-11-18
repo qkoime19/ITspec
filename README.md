@@ -767,6 +767,52 @@ Update-Database
 
 ---
 
+
+## Стъпка 10г — профили и публично търсене
+
+### 1. Полета на профила × кой ги вижда
+
+Профилът е 1:1 с потребителя и полетата са в Users — отделна таблица би повторила същите колони.
+
+| Поле | Публично (търсене, профил) | Самият техник (`/me/profile`) | Admin |
+|---|---|---|---|
+| FullName, City, видове устройства, AvgRating, ReviewsCount, брой завършени | да | да | да |
+| Email | не | да (не се сменя) | да |
+| Phone | не (само клиент с приета оферта) | да | не |
+| IsBlocked | не (блокираните не се показват) | — | да |
+| PasswordHash | никога | никога | никога |
+
+### 2. Публично търсене
+
+`GET /api/v1/technicians?deviceTypeId=&city=&page=` с `[AllowAnonymous]`. Филтрите са по избор и се добавят с `if (x != null) query = query.Where(…)`; накрая една SQL заявка. Подредба: рейтинг низходящо, после име; страници по 20.
+
+### 3. Изгледът
+
+Чете от `vw_TechnicianProfiles` (стъпка 8): име, град, видове (`STRING_AGG`), рейтинг, брой отзиви, брой завършени. Скрива блокираните (`WHERE IsBlocked = 0`) и няма телефон, имейл и адрес. В EF: `TechnicianProfileView` с `HasNoKey().ToView("vw_TechnicianProfiles")` — без миграция.
+
+### 4. Подмяна на N:M списъка
+
+`PUT /api/v1/technicians/me/device-types` с `{ "deviceTypeIds": [1, 3] }` → `usp_SetTechnicianDeviceTypes` през ADO.NET параметър `SqlDbType.Structured`, `TypeName = "dbo.IdListType"`, стойност `DataTable`. Несъществуващ или неактивен Id → THROW 50013 → **409**, старият списък остава (транзакция).
+
+### Endpoints
+
+| Метод | Адрес | Роля | Кодове |
+|---|---|---|---|
+| GET | /api/v1/technicians?deviceTypeId=&city=&page= | всички | 200 |
+| GET | /api/v1/technicians/{id} | всички | 200, 404 |
+| GET | /api/v1/technicians/me/profile | Technician | 200, 403 |
+| PUT | /api/v1/technicians/me/profile | Technician | 204, 400, 403 |
+| GET, PUT | /api/v1/technicians/me/device-types | Technician | 200 / 204, 403, 409 |
+
+### Решения
+
+- AI предложи таблица `TechnicianProfiles` (UserId, Bio, Phone) като в демото → **отхвърлих**: всички полета вече са в Users и нито една история не иска „Bio“. Затова `PUT /me/profile` е обикновен UPDATE, а не upsert.
+- AI предложи адрес `/profiles/{id}` за собствения профил → **отхвърлих**: `/me/profile` няма Id, потребителят е от токена.
+- AI предложи списъкът да се подава като текст `"1,3,5"` → **отхвърлих**: табличен тип с параметър.
+- Граничният ми случай: `PUT /me/device-types` с `[3, 999]` → 409 и видовете на Георги остават същите (тест 50–51).
+
+---
+
 ## SQL скриптове (backend/Database)
 
 Таблиците **не се пишат в SSMS**. Те се описват с C# класове (`Model/Entities`) и `AppDbContext`, а EF Core ги създава с миграции (Code First). Тук са SQL скриптовете за четене и проверка.
