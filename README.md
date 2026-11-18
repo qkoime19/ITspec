@@ -394,3 +394,48 @@ UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportReque
 - Бутоните се показват според ролята и статуса, но правата се проверяват на сървъра — скрит бутон не е защита.
 
 ---
+
+
+## Стъпка 6 — скелет на решението
+
+### 1. Имена
+
+| Нещо | Име | Защо |
+|---|---|---|
+| Решение | `Алекс.slnx` | името на папката в училище; не става namespace |
+| API проект | `backend/ITspec.Api` | става namespace `ITspec.Api` — без интервали и кирилица |
+| База | `ITspec` на `.\SQLEXPRESS` | на моя компютър няма LocalDB, затова SQL Server Express |
+| Папки | `backend/`, `frontend/`, `docs/` | като в демото; `frontend/` е празна до стъпка 11 |
+
+Пакети (всички 10.x, колкото .NET): `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`, `Microsoft.EntityFrameworkCore.Tools`, `Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.AspNetCore.OpenApi`, `Swashbuckle.AspNetCore.SwaggerUI`.
+
+Папки по MVC: `Controllers` (C), `Model/Entities`, `Model/Data`, `Model/Services` (M), `View/DTOs` (V), `Infrastructure/Auth`, `Infrastructure/Errors`, `Infrastructure/OpenApi` (извън MVC).
+
+### 2. Къде е всяка настройка
+
+| Настройка | Къде | Защо |
+|---|---|---|
+| `ConnectionStrings:Default` | `appsettings.json` (в Git) | не е тайна: Windows вход, без парола |
+| `Jwt:Issuer`, `Jwt:Audience`, `Jwt:ExpiresMinutes` | `appsettings.json` (в Git) | не са тайни, трябват на всеки, който пуска проекта |
+| `Jwt:Key` | **User Secrets** (`secrets.json` в профила на Windows, извън папката на проекта) | с ключа всеки може да подпише токен с роля Admin |
+| `Seed:DemoPassword` | `appsettings.Development.json` | само за демо потребителите в Development |
+
+`Program.cs` чете по избор и `appsettings.Local.json` (в `.gitignore`) — така е на моя компютър от началото. На нов компютър се ползва User Secrets: десен бутон върху `ITspec.Api` → **Manage User Secrets** → `{ "Jwt:Key": "<поне 32 случайни символа>" }`. Без ключ приложението спира при старт с ясно съобщение.
+
+### 3. Ако ключът веднъж се качи в GitHub
+
+Изтриването с нов commit не помага: ключът остава в историята на Git и във всяко копие (clone, fork), а с него всеки може да си издаде токен с роля Admin. Единственото решение е **ключът да се смени** (новите токени се подписват с новия, старите стават невалидни) и чак после да се почисти историята.
+
+### Проверка
+
+- Проектът се стартира с Ctrl+F5; отваря се `https://localhost:7095/swagger`.
+- В конзолата `Content root path` завършва на `backend\ITspec.Api`.
+- В GitHub няма `bin`, `obj`, `.vs`, `appsettings.Local.json` и ключ.
+
+### Решения
+
+- AI предложи ключът да е в `appsettings.Development.json` „за удобство“ → **отхвърлих**: този файл е в Git.
+- AI предложи да създам front-end проекта (Vite + React) още сега → **отхвърлих**: front-end-ът е стъпка 11; до тогава `frontend/` е празна (с `.gitkeep`), а API-то се проверява със Swagger.
+- AI предложи LocalDB като в демото → **отхвърлих** за моя компютър (LocalDB не е инсталиран, грешка 52); connection string-ът сочи към `.\SQLEXPRESS`.
+
+---

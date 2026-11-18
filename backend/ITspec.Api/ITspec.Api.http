@@ -1,0 +1,8 @@
+# Сценарии за ръчни тестове във Visual Studio: „Send request“ над всяка заявка, по ред.
+# Очакваният код е написан над всяка заявка. Сменете порта, ако е различен.
+
+@HostAddress = https://localhost:7095
+@Api = {{HostAddress}}/api/v1
+
+### OpenAPI описанието се отваря -> 200 (Swagger е на /swagger)
+GET {{HostAddress}}/openapi/v1.json
