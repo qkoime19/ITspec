@@ -5,6 +5,7 @@
 
 @HostAddress = https://localhost:7095
 @Api = {{HostAddress}}/api/v1
+@ApiV2 = {{HostAddress}}/api/v2
 
 ### ====================== ВХОД ======================
 
@@ -554,4 +555,25 @@ Content-Type: application/json
 
 ### 65. Профил на техник от клиент -> 403
 GET {{Api}}/technicians/me/profile
+Authorization: Bearer {{maria}}
+
+### ====================== ВЕРСИЯ 2 (10е) ======================
+
+### 66. v1 списък -> 200, гол масив + заглавие Deprecation: true
+GET {{Api}}/requests
+Authorization: Bearer {{maria}}
+
+### 67. v2 списък -> 200, { items, page, pageSize, total }, deviceType е обект
+GET {{ApiV2}}/requests
+Authorization: Bearer {{maria}}
+
+### 68. v2 с филтър и страница 2 по 1 -> 200
+GET {{ApiV2}}/requests?status=Open&page=2&pageSize=1
+Authorization: Bearer {{maria}}
+
+### 69. v2 без токен -> 401
+GET {{ApiV2}}/requests
+
+### 70. v3 не съществува -> 404
+GET {{HostAddress}}/api/v3/requests
 Authorization: Bearer {{maria}}

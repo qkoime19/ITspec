@@ -80,6 +80,59 @@ public class RequestService(AppDbContext db)
     public const int PageSize = 20;
 
     /// <summary>
+    /// Версия 2 на списъка (стъпка 10е): същите правила като v1 (според ролята),
+    /// но със страници и общ брой. Total се брои в базата с CountAsync, не в паметта.
+    /// </summary>
+    public async Task<PagedResult<RequestListItemV2Dto>> GetPageV2Async(
+        int userId, string role, RequestStatus? status, int? deviceTypeId, int page, int pageSize)
+    {
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+
+        var query = db.SupportRequests.AsQueryable();
+        if (role == Roles.Client)
+        {
+            query = query.Where(r => r.ClientId == userId);
+        }
+        else if (role == Roles.Technician)
+        {
+            // Техникът вижда само отворените заявки в своите видове устройства — като в v1.
+            query = query.Where(r => r.Status == RequestStatus.Open
+                                     && db.TechnicianDeviceTypes.Any(t => t.TechnicianId == userId && t.DeviceTypeId == r.DeviceTypeId));
+        }
+
+        if (status is not null)
+        {
+            query = query.Where(r => r.Status == status);
+        }
+
+        if (deviceTypeId is not null)
+        {
+            query = query.Where(r => r.DeviceTypeId == deviceTypeId);
+        }
+
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(r => new RequestListItemV2Dto(
+                r.SupportRequestId,
+                r.Title,
+                new DeviceTypeRefDto(r.DeviceTypeId, r.DeviceType.Name),
+                r.DeviceModel,
+                r.City,
+                r.PreferredDate,
+                r.Status,
+                r.CreatedAt,
+                r.Offers.Count(o => o.Status != OfferStatus.Withdrawn),
+                r.Client.FullName))
+            .ToListAsync();
+
+        return new PagedResult<RequestListItemV2Dto>(items, page, pageSize, total);
+    }
+
+    /// <summary>
     /// Публичната „дъска с обяви“: отворените заявки от изгледа vw_OpenSupportRequests,
     /// с филтри по вид устройство, град и текст. Вижда се и без вход.
     /// Изгледът няма адрес и телефон, затова тук скритите данни не могат да излязат.

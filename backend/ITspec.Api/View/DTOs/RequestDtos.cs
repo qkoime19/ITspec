@@ -84,3 +84,23 @@ public class CreateReviewDto
 
 public record ReviewDto(int ReviewId, byte Rating, string? Comment, DateTime CreatedAt);
 
+// ---------- Версия 2 (стъпка 10е) ----------
+
+/// <summary>Страница от списък: елементите + номер, размер и общ брой.</summary>
+public record PagedResult<T>(List<T> Items, int Page, int PageSize, int Total);
+
+/// <summary>Видът устройство като вложен обект (в v1 е само име в DeviceTypeName).</summary>
+public record DeviceTypeRefDto(int Id, string Name);
+
+/// <summary>Ред в списъка, v2: deviceType е обект { id, name } вместо низ.</summary>
+public record RequestListItemV2Dto(
+    int SupportRequestId,
+    string Title,
+    DeviceTypeRefDto DeviceType,
+    string? DeviceModel,
+    string City,
+    DateOnly? PreferredDate,
+    RequestStatus Status,
+    DateTime CreatedAt,
+    int OffersCount,
+    string ClientName);

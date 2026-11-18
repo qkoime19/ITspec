@@ -16,10 +16,16 @@ namespace ITspec.Api.Controllers;
 [Authorize]
 public class RequestsController(RequestService requests, OfferService offers) : ControllerBase
 {
-    /// <summary>Списък според ролята.</summary>
+    /// <summary>
+    /// Списък според ролята (v1, гол масив). Остаряла: новите клиенти ползват
+    /// GET /api/v2/requests (страници + общ брой). v1 работи до края на учебната година.
+    /// </summary>
     [HttpGet]
+    [Obsolete("Използвайте GET /api/v2/requests.")]
     public async Task<ActionResult<List<RequestListItemDto>>> GetAll()
     {
+        Response.Headers["Deprecation"] = "true";
+        Response.Headers["Link"] = "</api/v2/requests>; rel=\"successor-version\"";
         return Ok(await requests.GetListAsync(User.GetUserId(), User.GetRole()));
     }
 

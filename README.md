@@ -4,7 +4,195 @@
 
 > Учебна практика: Интернет програмиране, 12 клас · Тема 8 от 12 · **Александър Калоянов**
 
-> Работна версия: документацията се допълва с всяка стъпка от плана.
+## Съдържание
+
+- [Технологии, роли, жизнен цикъл](#технологии)
+- [Структура](#структура)
+- [Пускане](#пускане)
+- [Стъпка 1 — проблем, роли и потребителски истории](#стъпка-1--проблем-роли-и-потребителски-истории)
+- [Стъпка 2 — същности и връзки](#стъпка-2--същности-и-връзки)
+- [Стъпка 3 — бизнес правила](#стъпка-3--бизнес-правила)
+- [Стъпка 4 — API договор](#стъпка-4--api-договор)
+- [Стъпка 5 — екрани](#стъпка-5--екрани)
+- [Стъпка 6 — скелет на решението](#стъпка-6--скелет-на-решението)
+- [Стъпка 6б — MVC](#стъпка-6б--mvc)
+- [Стъпка 7 — модели и миграции](#стъпка-7--модели-и-миграции)
+- [Стъпка 8 — процедури, табличен тип и изгледи](#стъпка-8--процедури-табличен-тип-и-изгледи)
+- [Стъпка 9 — вход, JWT и роли](#стъпка-9--вход-jwt-и-роли)
+- [Стъпка 10а — каталогът: видове устройства](#стъпка-10а--каталогът-видове-устройства)
+- [Стъпка 10б — основният ресурс: заявки](#стъпка-10б--основният-ресурс-заявки)
+- [Стъпка 10в — оферти и процедурата](#стъпка-10в--оферти-и-процедурата)
+- [Стъпка 10г — профили и публично търсене](#стъпка-10г--профили-и-публично-търсене)
+- [Стъпка 10д — администратор](#стъпка-10д--администратор)
+- [Стъпка 10е — версия 2](#стъпка-10е--версия-2)
+- [SQL скриптове](#sql-скриптове-backenddatabase)
+- [Използван чужд код и AI](#използван-чужд-код-и-ai)
+
+Номерата на историите (U1…U12) и на правилата (R1…R13) се използват в цялата документация. Всяка стъпка завършва с „Решения“: какво предложи AI, какво е прието и какво е отхвърлено и защо.
+
+## Технологии
+
+| Част | Технология |
+| --- | --- |
+| Back-end | ASP.NET Core Web API (.NET 10) |
+| Достъп до данни | EF Core, Code First — таблиците се създават от C# класовете с миграции, без SSMS |
+| База данни | MS SQL Server Express (или LocalDB) |
+| Сигурност | JWT токени и роли |
+| Документация и ръчни тестове | Swagger, `.http` файл (103 сценария), SQL тестове (19) |
+| Версии на API | `/api/v1` и `/api/v2` (списъкът със заявки) |
+| Front-end | стъпка 11 — още не е започнат; API-то се проверява със Swagger и `.http` |
+
+## Роли
+
+| Роля | Прави | Вижда |
+| --- | --- | --- |
+| **Client** | публикува заявки; приема една оферта по своя заявка; прекратява своя заявка; оставя отзив след завършване | своите заявки и офертите по тях |
+| **Technician** | избира с кои видове устройства работи; дава оферти по отворени заявки в тях; завършва работата по приетата си оферта | отворените заявки в своите видове; **адреса и телефона на клиента — само след като неговата оферта е приета** |
+| **Admin** | управлява видовете устройства; блокира потребители | всички заявки, оферти и отзиви; статистика |
+
+## Жизнен цикъл на заявката
+
+```
+  Open ──приема оферта (Client)──► Assigned ──завършва (приетият Technician)──► Completed ──► отзив
+    │                                 │
+    └──────── прекратява (Client) ────┴──► Cancelled
+```
+
+## Собствено правило
+
+**Техник не може да има повече от 3 поети (Assigned) заявки едновременно.** Пази се в процедурата `usp_AcceptOffer`, в транзакцията на приемането, със заключване на реда на техника — така двама клиенти не могат едновременно да му дадат четвърта поръчка. Подробно: [Стъпка 3 — бизнес правила](#стъпка-3--бизнес-правила), правило R10.
+
+## Структура
+
+```
+ITspec/
+├── Алекс.slnx
+├── README.md                   цялата документация (този файл)
+├── backend/
+│   ├── ITspec.Api/
+│   │   ├── Controllers/        C: Auth, DeviceTypes, Requests, RequestsV2, Offers, Technicians, Admin
+│   │   ├── Model/
+│   │   │   ├── Entities/       класовете за таблиците и изгледите (Code First)
+│   │   │   ├── Data/           AppDbContext, DbSeeder, Migrations, Sql/SqlObjects.cs
+│   │   │   └── Services/       бизнес логиката: кога 403 / 404 / 409
+│   │   ├── View/DTOs/          какво влиза и излиза от API-то (никога Entity)
+│   │   ├── Infrastructure/     Auth (JWT), Errors (ProblemDetails), OpenApi (Authorize в Swagger)
+│   │   └── ITspec.Api.http     103 сценария за ръчни тестове
+│   └── Database/               SQL скриптове: процедури, тестови данни, 19 теста
+├── frontend/                   празна до стъпка 11 (front-end)
+└── docs/                       само картинките: ER диаграма, статуси, скици на екраните
+```
+
+## Пускане
+
+**Нужно е:** .NET 10 SDK, Visual Studio с „ASP.NET and web development“, SQL Server Express (или LocalDB), SSMS.
+
+0. `git clone https://github.com/qkoime19/ITspec.git` и отворете `Алекс.slnx` във Visual Studio.
+1. **Connection string.** В `appsettings.json`:
+   `"Default": "Server=.\\SQLEXPRESS;Database=ITspec;Trusted_Connection=True;TrustServerCertificate=True"`.
+   С LocalDB сменете `Server=` на `(localdb)\\MSSQLLocalDB`. Двойната `\\` е задължителна: в JSON `\` е специален знак.
+2. **JWT ключ.** Десен бутон върху проекта `ITspec.Api` → **Manage User Secrets** → `{ "Jwt:Key": "<поне 32 случайни символа>" }`.
+   Ключът не е в Git: всеки си задава свой. Може и файл `ITspec.Api/appsettings.Local.json` (в `.gitignore`) със същото съдържание `{ "Jwt": { "Key": "..." } }`.
+   Без ключ приложението спира при старт с ясно съобщение.
+3. **Миграциите вече са създадени** в `Model/Data/Migrations` (Code First — таблиците не се пишат в SSMS):
+   - `InitialCreate` — генерирана от `AppDbContext`: 6-те таблици, ограниченията, видовете устройства и администратора;
+   - `SqlObjects` — генерирана празна, а `Up`/`Down` са попълнени на ръка с `SqlCode.Create(...)` / `SqlCode.Drop(...)` (кодът е в `Model/Data/Sql/SqlObjects.cs`).
+     Псевдонимът `SqlCode` е нужен, защото самата миграция също се казва `SqlObjects`.
+
+   Как са създадени (за да можете да ги пресъздадете): Package Manager Console →
+   ```
+   Add-Migration InitialCreate -OutputDir Model/Data/Migrations
+   Add-Migration SqlObjects -OutputDir Model/Data/Migrations
+   ```
+4. **База.** При старт в Development приложението само прилага миграциите (`MigrateAsync` в `Program.cs` — същото като `Update-Database`), така че базата `ITspec` се създава при първото пускане. Може и ръчно: `Update-Database`.
+   В SSMS → `.\SQLEXPRESS` → Refresh: 6 таблици, 3 процедури, 2 изгледа, тип `IdListType` и `__EFMigrationsHistory` с 2 реда.
+5. **Старт.** Профил **https** → Ctrl+F5. Отваря се Swagger: `https://localhost:7095/swagger`.
+
+При първия старт в Development се създават демо потребители (`Model/Data/DbSeeder.cs`):
+
+| Имейл | Роля | Видове устройства |
+|---|---|---|
+| admin@itspec.local (парола `Admin123!`) | Admin | — |
+| maria@itspec.local, petar@itspec.local | Client | — |
+| ivan@itspec.local | Technician | Лаптоп, Настолен компютър |
+| georgi@itspec.local | Technician | Смартфон, Таблет |
+| nikola@itspec.local | Technician | Лаптоп, Смартфон, Принтер, Рутер и мрежа |
+
+Паролата на демо потребителите е `Demo123!` (`appsettings.Development.json`, `Seed:DemoPassword`). Администраторът идва от миграцията, не от DbSeeder.
+
+### Структура на проекта (MVC)
+
+| Папка | Слой | Какво има |
+|---|---|---|
+| `Controllers/` | C | Тънки контролери: приемат заявката, проверяват ролята, викат Service, връщат отговор. Без `try/catch`. |
+| `Model/Entities/` | M | Класовете за таблиците и изгледите, enum-ите за статусите, ролите |
+| `Model/Data/` | M | `AppDbContext`, `DbSeeder`, миграциите, `Sql/SqlObjects.cs` |
+| `Model/Services/` | M | Бизнес правилата: кой какво може, кога 403/404/409 |
+| `View/DTOs/` | V | Какво влиза и излиза от API-то. Entity клас никога не се връща. |
+| `Infrastructure/Auth/` | — | JWT токени и имена на claims |
+| `Infrastructure/Errors/` | — | `AppException` и `ApiExceptionHandler`: едно място, където грешка става HTTP отговор |
+| `Infrastructure/OpenApi/` | — | Бутонът **Authorize** в Swagger |
+
+### Обекти в базата
+
+| Обект | Вид | Правило, заради което съществува |
+|---|---|---|
+| `usp_AcceptOffer` | процедура + транзакция | точно една приета оферта; останалите се отхвърлят; заявката става Assigned; **собствено правило:** най-много 3 поети заявки на техник |
+| `usp_AddReview` | процедура + транзакция | отзив веднъж, за своя завършена заявка; рейтингът на техника се преизчислява |
+| `usp_SetTechnicianDeviceTypes` | процедура + табличен тип | видовете устройства се сменят изцяло или изобщо не |
+| `dbo.IdListType` | табличен тип | списък от Id като един параметър |
+| `vw_OpenSupportRequests` | изглед | „кои заявки чакат оферти?“, без адрес и телефон |
+| `vw_TechnicianProfiles` | изглед | „какъв е този техник?“, без телефон и без блокираните |
+
+### API накратко
+
+Всички адреси започват с `/api/v1`. Пълният договор е в [Стъпка 4 — API договор](#стъпка-4--api-договор).
+
+| Ресурс | Адреси | Кой |
+|---|---|---|
+| Вход | `POST auth/register/client`, `POST auth/register/technician`, `POST auth/login`, `GET auth/me` | всички / логнат |
+| Видове устройства | `GET device-types`, `GET device-types/{id}`; `POST`, `PUT`, `DELETE device-types/{id}` | всички; Admin |
+| Заявки | `GET requests/open` (публично), `GET requests`, `GET requests/mine`, `GET requests/{id}`, `POST requests`, `PUT requests/{id}`, `POST requests/{id}/cancel`, `/complete`, `/review` | според ролята |
+| Оферти | `GET`/`POST requests/{id}/offers`, `GET offers/mine`, `POST offers/{id}/accept`, `POST offers/{id}/withdraw` | Client / Technician |
+| Техници | `GET technicians?deviceTypeId=&city=&page=`, `GET technicians/{id}`, `GET`/`PUT technicians/me/profile`, `GET`/`PUT technicians/me/device-types` | всички; Technician |
+| Админ | `GET admin/users?role=&blocked=&page=`, `POST admin/users/{id}/block`, `/unblock`, `GET admin/requests`, `GET admin/stats` | Admin |
+| v2 | `GET /api/v2/requests?status=&deviceTypeId=&page=&pageSize=` | логнат |
+
+**Грешки** (`ApiExceptionHandler`), всички във формат ProblemDetails:
+
+| Код | Кога |
+|---|---|
+| 400 | невалидни данни (DTO валидация), неактивен вид устройство, SQL грешка 50007 (оценка извън 1–5), 547 |
+| 401 | липсва или е невалиден токен; грешен имейл или парола |
+| 403 | грешна роля; вид устройство извън своите; блокиран акаунт |
+| 404 | няма такъв ресурс **или е чужд** (не издаваме, че съществува) |
+| 409 | нарушено бизнес правило: SQL грешки 50001–50099, дублиран запис (2601/2627), грешен статус |
+| 500 | всичко друго, без технически детайли |
+
+### Тестове
+
+| Къде | Какво | Как |
+|---|---|---|
+| `backend/Database/05_tests.sql` | 19 теста на правилата в базата | в SSMS, след `04_test_data.sql` → очаквано 19 PASS |
+| `backend/ITspec.Api/ITspec.Api.http` | 103 сценария през HTTP, групирани по ресурси | във Visual Studio, „Send request“ над всяка заявка, по ред; очакваният код е написан над всяка |
+| Swagger | ръчни опити | `/swagger` → login → копирайте `token` → **Authorize** |
+
+### Чести проблеми
+
+| Симптом | Причина | Решение |
+|---|---|---|
+| „Липсва Jwt:Key…“ при старт или при Add-Migration | няма User Secrets или ключът е под 32 символа | Manage User Secrets |
+| SqlException в `DbSeeder.cs` при старт (грешка 52 или 26) | SQL Server не е пуснат или connection string-ът сочи към друг сървър | пуснете услугата SQL Server (SQLEXPRESS) или сменете `Server=` |
+| „Invalid object name 'vw_…'“ или „Could not find stored procedure“ | миграцията SqlObjects не е приложена | `Update-Database` |
+| „There is already an object named …“ при `Update-Database` | базата е създадена ръчно | `Drop-Database`, после `Update-Database` |
+| ERR_CONNECTION_REFUSED | API-то не работи: Build с грешки или срив при старт | Error List и конзолата |
+
+### Известни ограничения (за дискусия)
+
+- **Блокиран потребител със стар токен** продължава да работи до изтичането на токена (120 минути).
+- **Приемането на чужда оферта дава 409, не 404:** проверката е вътре в `usp_AcceptOffer` (грешка 50002). Всички други чужди записи дават 404.
+
+---
 
 # Документация по стъпки
 
@@ -73,7 +261,6 @@
 - AI посочи, че админът има само една история → **приех** и добавих U11 и U12, за да има поне 3 истории на роля.
 
 ---
-
 
 ## Стъпка 2 — същности и връзки
 
@@ -178,7 +365,6 @@ UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportReque
 
 ---
 
-
 ## Стъпка 3 — бизнес правила
 
 Колкото по-близо до данните е правилото, толкова по-трудно се заобикаля. Затова мястото се избира в този ред: **ограничение в базата → процедура с транзакция → проверка в API**.
@@ -250,7 +436,6 @@ UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportReque
 - AI предложи 403 за чужд запис → **отхвърлих** и избрах 404 навсякъде (R13): 404 не издава, че записът съществува. Изключение е приемането на оферта (R5): там проверката е вътре в процедурата и тя връща 409, защото тестовете на процедурата в SSMS очакват грешка 50002.
 
 ---
-
 
 ## Стъпка 4 — API договор
 
@@ -343,7 +528,6 @@ UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportReque
 
 ---
 
-
 ## Стъпка 5 — екрани
 
 Екраните са спецификацията за front-end-а (стъпка 11): какво показва всеки екран и от кой endpoint идват данните. Самите екрани още не са направени — до стъпка 10 API-то се проверява със Swagger и `.http`. Скиците (телефонен вид) са в [`docs/05-wireframes/`](docs/05-wireframes).
@@ -395,7 +579,6 @@ UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportReque
 
 ---
 
-
 ## Стъпка 6 — скелет на решението
 
 ### 1. Имена
@@ -440,7 +623,6 @@ UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportReque
 
 ---
 
-
 ## Стъпка 6б — MVC
 
 Учебната подстъпка е в tag `stapka-06b`: каталогът (видове устройства) от **списък в паметта**, подреден по слоевете на MVC, още без база. В стъпка 7 вътрешността на `DeviceTypeService` се сменя с EF Core, а `DeviceTypesController` остава почти същият — това доказва, че слоевете са разделени правилно.
@@ -473,7 +655,6 @@ Name е задължително, 2–60 символа (`[Required]`, `[StringL
 - AI предложи `AddScoped` още в 6б → **отхвърлих**: списъкът в паметта трябва да живее, докато работи приложението, затова `AddSingleton`. От стъпка 7 сервизът е `AddScoped`, защото `AppDbContext` живее колкото една HTTP заявка.
 
 ---
-
 
 ## Стъпка 7 — модели и миграции
 
@@ -532,7 +713,6 @@ Update-Database
 
 ---
 
-
 ## Стъпка 8 — процедури, табличен тип и изгледи
 
 Кодът е в `Model/Data/Sql/SqlObjects.cs` (по един C# низ за всеки обект) и в `backend/Database/02_objects.sql` (същият код за SSMS). Миграцията `20261021051403_SqlObjects` е генерирана **празна** (моделът не се е променил) и `Up`/`Down` са попълнени на ръка: `Up` създава типа → процедурите → изгледите; `Down` ги трие в обратен ред, **типът последен**, защото `usp_SetTechnicianDeviceTypes` го ползва.
@@ -586,7 +766,6 @@ Update-Database
 - AI пренаписа приемането на C# с три `SaveChanges` → **отхвърлих**: всичко или нищо се гарантира в процедурата, C# само я вика с `ExecuteSqlInterpolatedAsync` (параметри, не слепен текст).
 
 ---
-
 
 ## Стъпка 9 — вход, JWT и роли
 
@@ -656,7 +835,6 @@ Update-Database
 
 ---
 
-
 ## Стъпка 10а — каталогът: видове устройства
 
 | Метод | Адрес | Роля | Вход | Изход | Кодове |
@@ -688,7 +866,6 @@ Update-Database
 - Граничният ми случай: нова заявка с изтрит вид → 400 (тест 48.9).
 
 ---
-
 
 ## Стъпка 10б — основният ресурс: заявки
 
@@ -736,7 +913,6 @@ Update-Database
 
 ---
 
-
 ## Стъпка 10в — оферти и процедурата
 
 ### 1. Endpoints
@@ -766,7 +942,6 @@ Update-Database
 - Граничният ми случай: приемане на оферта на техник, който вече има 3 поети заявки → 409 и заявката остава Open (SQL тест T18).
 
 ---
-
 
 ## Стъпка 10г — профили и публично търсене
 
@@ -813,7 +988,6 @@ Update-Database
 
 ---
 
-
 ## Стъпка 10д — администратор
 
 ### 1. Админските действия
@@ -855,6 +1029,56 @@ SELECT Status, COUNT(*) FROM dbo.SupportRequests GROUP BY Status;
 
 ---
 
+## Стъпка 10е — версия 2
+
+### 1. Чупещата промяна
+
+v1 връща **гол масив**, а видът устройство е низ `deviceTypeName`. v2 връща **обект със страница** и видът е **вложен обект**. Стар клиент, който прави `response.forEach(...)` или чете `item.deviceTypeName`, ще се счупи — затова е нова версия, а не промяна на v1.
+
+**v1** — `GET /api/v1/requests`:
+```json
+[
+  { "supportRequestId": 7, "title": "Лаптопът не зарежда", "deviceTypeName": "Лаптоп",
+    "deviceModel": "Acer Aspire 5", "city": "Враца", "status": "Open", "offersCount": 2, "clientName": "Мария Иванова", "…": "…" }
+]
+```
+
+**v2** — `GET /api/v2/requests?page=1&pageSize=20`:
+```json
+{
+  "items": [
+    { "supportRequestId": 7, "title": "Лаптопът не зарежда", "deviceType": { "id": 1, "name": "Лаптоп" },
+      "deviceModel": "Acer Aspire 5", "city": "Враца", "status": "Open", "offersCount": 2, "clientName": "Мария Иванова", "…": "…" }
+  ],
+  "page": 1, "pageSize": 20, "total": 12
+}
+```
+
+### 2. Кои endpoints има v2
+
+Само `GET /api/v2/requests?status=&deviceTypeId=&page=&pageSize=` (pageSize от 1 до 50). Същите правила като v1: клиентът вижда своите, техникът — отворените в своите видове, админът — всички.
+
+### 3. До кога работи v1
+
+v1 работи до края на учебната година. Маркирана е с `[Obsolete]` (в Swagger е зачертана) и всеки отговор има заглавия `Deprecation: true` и `Link: </api/v2/requests>; rel="successor-version"`.
+
+### 4. Какво се променя в базата
+
+Нищо — няма миграция. `total` се брои в базата с `CountAsync`, а страницата — с `OrderBy → Skip → Take`.
+
+### Код
+
+`Controllers/RequestsV2Controller.cs` (`[Route("api/v2/requests")]`), нов метод `GetPageV2Async` в **същия** `RequestService`, DTO-та `PagedResult<T>`, `DeviceTypeRefDto`, `RequestListItemV2Dto` в `View/DTOs/RequestDtos.cs`. Тестове: `ITspec.Api.http`, 66–70.
+
+### Решения
+
+- AI предложи `RequestServiceV2` → **отхвърлих**: копиран сервиз означава, че поправка в единия ще бъде забравена в другия.
+- AI „подобри“ и v1, като добави страници → **отхвърлих**: старите тестове трябва да минават без промяна.
+- AI предложи версия в заглавие (`api-version: 2`) → **отхвърлих**: версията в адреса е по-лесна за тестване в `.http` и Swagger.
+- Добавяне на незадължително поле (например `rating`) **не** изисква v3 — старите клиенти просто го игнорират.
+
+---
+
 ## SQL скриптове (backend/Database)
 
 Таблиците **не се пишат в SSMS**. Те се описват с C# класове (`Model/Entities`) и `AppDbContext`, а EF Core ги създава с миграции (Code First). Тук са SQL скриптовете за четене и проверка.
@@ -886,3 +1110,10 @@ SELECT Status, COUNT(*) FROM dbo.SupportRequests GROUP BY Status;
 | 50011 | usp_SetTechnicianDeviceTypes | потребителят не е техник | 409 |
 | 50012 | usp_SetTechnicianDeviceTypes | празен списък | 409 |
 | 50013 | usp_SetTechnicianDeviceTypes | несъществуващ или неактивен вид | 409 |
+
+---
+
+## Използван чужд код и AI
+
+- Библиотеки (NuGet): Entity Framework Core, ASP.NET Core JWT Bearer, Microsoft.AspNetCore.OpenApi, Swashbuckle Swagger UI — всички на Microsoft / с лиценз MIT.
+- Части от кода и документацията са изготвени с помощта на AI асистента Claude (Anthropic), както разрешава заданието; генерираното съдържание е прегледано и тествано, а решенията са записани в раздела „Решения“ на всеки файл в `docs/`.
