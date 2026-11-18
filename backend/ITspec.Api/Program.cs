@@ -1,6 +1,11 @@
 using System.Text.Json.Serialization;
+using ITspec.Api.Model.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ---------- Услуги ----------
+// Стъпка 6б: каталогът е списък в паметта, затова Singleton (живее, докато работи приложението).
+builder.Services.AddSingleton<DeviceTypeService>();
 
 // ---------- Контролери и Swagger ----------
 builder.Services.AddControllers()
