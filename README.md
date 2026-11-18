@@ -689,6 +689,53 @@ Update-Database
 
 ---
 
+
+## Стъпка 10б — основният ресурс: заявки
+
+### 1. Статуси (проверено — още вярно спрямо стъпка 3)
+
+`(нова) → Open → Assigned → Completed`, `Open/Assigned → Cancelled`. Промяна на съдържанието — само в Open. Диаграмата е в [`docs/03-statuses.png`](docs/03-statuses.png).
+
+### 2. Endpoints
+
+| Метод | Адрес | Роля | Разрешен статус | Вход | Изход | Кодове |
+|---|---|---|---|---|---|---|
+| POST | /api/v1/requests | Client | — (създава Open) | `CreateRequestDto` | `RequestDetailsDto` | 201 + Location, 400, 403 |
+| GET | /api/v1/requests/mine?status=&page= | Client | всички | — | списък `RequestListItemDto` | 200 |
+| GET | /api/v1/requests/{id} | собственик (и техник/админ по правилата) | всички | — | `RequestDetailsDto` | 200, 404 |
+| PUT | /api/v1/requests/{id} | Client (собственик) | Open | `UpdateRequestDto` | — | 204, 400, 404, 409 |
+| POST | /api/v1/requests/{id}/cancel | Client (собственик) | Open, Assigned | — | — | 204, 404, 409 |
+
+### 3. Кои полета откъде идват
+
+| Поле | Създаване | Промяна | Откъде |
+|---|---|---|---|
+| DeviceTypeId, Title, Description, DeviceModel, City, PreferredDate | да | да | от клиента (DTO с валидация) |
+| ClientId | — | — | **никога от клиента** — `User.GetUserId()` |
+| Status | — | — | никога от клиента — Open при създаване, после само с действия |
+| CreatedAt, SupportRequestId | — | — | от SQL Server |
+
+Тест 13.1: `"status": "Completed"` и `"clientId": 3` в тялото → 201, статусът е Open, собственикът е Мария (полетата ги няма в DTO-то).
+
+### 4. 404 или 409, когато ExecuteUpdateAsync върне 0
+
+`PUT` е един `UPDATE … WHERE SupportRequestId = @id AND ClientId = @me AND Status = 'Open'`. Ако са променени 0 реда, `AnyAsync(r => r.Id == id && r.ClientId == me)` казва защо: заявката е моя → значи статусът не позволява → **409**; не е моя или я няма → **404**. Прекратяването е същото, но с `Status IN (Open, Assigned)`, а чакащите оферти стават Rejected във втори UPDATE в **обща транзакция**.
+
+Защо не „прочети → провери → запиши“: между проверката и записа друг (например клиентът в друг таб, който приема оферта) може да смени статуса. Един UPDATE с условие е атомарен.
+
+### 5. „Моите“
+
+Винаги филтър по собственик от токена; незадължителен `?status=`; подредба `CreatedAt` низходящо; страници по 20 (`OrderBy → Skip → Take`).
+
+### Решения
+
+- AI сложи `ClientId` във входното DTO → **отхвърлих** (mass assignment).
+- AI предложи `DELETE /requests/{id}` за отказ → **отхвърлих**: прекратяването сменя статус, историята и офертите остават.
+- AI предложи 403 за чужда заявка → **отхвърлих**, 404 (R13).
+- Граничният ми случай: заявка с несъществуващ вид устройство → 400, не 500 (тест 13.2); редакция на заявка, която вече е Completed → 409 (тест 45.2).
+
+---
+
 ## SQL скриптове (backend/Database)
 
 Таблиците **не се пишат в SSMS**. Те се описват с C# класове (`Model/Entities`) и `AppDbContext`, а EF Core ги създава с миграции (Code First). Тук са SQL скриптовете за четене и проверка.

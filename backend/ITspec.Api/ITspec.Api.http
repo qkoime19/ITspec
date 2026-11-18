@@ -90,6 +90,123 @@ Content-Type: application/json
 
 { "fullName": "Тест Техник", "email": "t@itspec.local", "password": "Test123!", "phone": "abc", "city": "Враца" }
 
+### ====================== ЗАЯВКИ ======================
+
+### 13. Нова заявка от клиент (Лаптоп) -> 201
+# @name newRequest
+POST {{Api}}/requests
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 1, "title": "Не се включва след ъпдейт", "description": "След ъпдейт на Windows лаптопът стои на черен екран.", "deviceModel": "HP 250 G8" }
+
+@requestId = {{newRequest.response.body.$.supportRequestId}}
+
+### 13.1 Нова заявка със "status": "Completed" и чужд "clientId" в тялото -> 201, статусът е Open, собственикът е Мария
+# Входното DTO няма Status и ClientId, затова тези полета се игнорират (защита от mass assignment).
+POST {{Api}}/requests
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 2, "title": "Компютърът прегрява", "description": "Вентилаторът вие и компютърът се изключва.", "status": "Completed", "clientId": 3 }
+
+### 13.2 Нова заявка с несъществуващ вид устройство -> 400 (не 500)
+POST {{Api}}/requests
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 999, "title": "Несъществуващ вид", "description": "Видът устройство не съществува." }
+
+### 13.3 Детайли на чужда заявка (Петър) -> 404
+GET {{Api}}/requests/{{requestId}}
+Authorization: Bearer {{petar}}
+
+### 14. Нова заявка от техник -> 403
+POST {{Api}}/requests
+Authorization: Bearer {{ivan}}
+Content-Type: application/json
+
+{ "deviceTypeId": 1, "title": "Опит от техник", "description": "Техникът не може да публикува заявки." }
+
+### 15. Нова заявка без токен -> 401
+POST {{Api}}/requests
+Content-Type: application/json
+
+{ "deviceTypeId": 1, "title": "Без токен", "description": "Без токен не става." }
+
+### 16. Списък на клиента (само своите) -> 200
+GET {{Api}}/requests
+Authorization: Bearer {{maria}}
+
+### 17. Списък на техник Иван (отворените за Лаптоп и Настолен компютър) -> 200
+GET {{Api}}/requests
+Authorization: Bearer {{ivan}}
+
+### 18. Детайли преди приемане: clientPhone и clientAddress са null -> 200
+GET {{Api}}/requests/{{requestId}}
+Authorization: Bearer {{ivan}}
+
+### ====================== ПРЕКРАТЯВАНЕ ======================
+
+### 42. Нова заявка за прекратяване -> 201
+# @name toCancel
+POST {{Api}}/requests
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 5, "title": "Принтерът не печата", "description": "Принтерът показва грешка E3 и не печата." }
+
+### 42.1 Редакция от собственика, докато е Open -> 204
+PUT {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 5, "title": "Принтерът не печата (HP)", "description": "Принтерът показва грешка E3 и не печата.", "deviceModel": "HP LaserJet 1020" }
+
+### 42.2 След редакцията GET показва новото заглавие -> 200
+GET {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}
+Authorization: Bearer {{maria}}
+
+### 42.3 Редакция от Петър (чужда заявка) -> 404
+PUT {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}
+Authorization: Bearer {{petar}}
+Content-Type: application/json
+
+{ "deviceTypeId": 5, "title": "Чужда редакция", "description": "Опит да променя чужда заявка." }
+
+### 42.4 Редакция с кратко заглавие -> 400
+PUT {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 5, "title": "Абв", "description": "Принтерът показва грешка E3 и не печата." }
+
+### 42.5 Редакция на несъществуваща заявка -> 404
+PUT {{Api}}/requests/999999
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 5, "title": "Няма такава заявка", "description": "Тази заявка не съществува." }
+
+### 43. Прекратяване от Петър (чужда) -> 404
+POST {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}/cancel
+Authorization: Bearer {{petar}}
+
+### 44. Прекратяване от собственика -> 204
+POST {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}/cancel
+Authorization: Bearer {{maria}}
+
+### 45. Второ прекратяване -> 409
+POST {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}/cancel
+Authorization: Bearer {{maria}}
+
+### 45.1 Редакция на прекратена заявка -> 409
+PUT {{Api}}/requests/{{toCancel.response.body.$.supportRequestId}}
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 5, "title": "Принтерът не печата", "description": "Опит за редакция след прекратяване." }
+
 ### ====================== ВИДОВЕ УСТРОЙСТВА ======================
 
 ### 46. Публичен списък -> 200
@@ -171,3 +288,24 @@ Authorization: Bearer {{admin}}
 
 ### 48.8 Изтритият вид по id -> 404, и го няма в публичния списък (GET /device-types)
 GET {{Api}}/device-types/{{newType.response.body.$.deviceTypeId}}
+
+### 48.9 Нова заявка с изтрития вид -> 400
+POST {{Api}}/requests
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": {{newType.response.body.$.deviceTypeId}}, "title": "Часовникът не се зарежда", "description": "Смарт часовникът не се зарежда от вчера." }
+
+### ====================== МОИТЕ ЗАЯВКИ (10б) ======================
+
+### 55. „Моите“ на Мария -> 200, само нейните, най-новите първи
+GET {{Api}}/requests/mine
+Authorization: Bearer {{maria}}
+
+### 56. „Моите“ само отворени, страница 1 -> 200
+GET {{Api}}/requests/mine?status=Open&page=1
+Authorization: Bearer {{maria}}
+
+### 57. „Моите“ от техник -> 403
+GET {{Api}}/requests/mine
+Authorization: Bearer {{ivan}}

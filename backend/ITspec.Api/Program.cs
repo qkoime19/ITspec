@@ -55,6 +55,7 @@ builder.Services.AddScoped<JwtTokenService>();
 // ---------- Услуги (бизнес логиката) ----------
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DeviceTypeService>();
+builder.Services.AddScoped<RequestService>();
 
 // ---------- Грешки: едно място, където изключение става HTTP отговор ----------
 builder.Services.AddProblemDetails();
