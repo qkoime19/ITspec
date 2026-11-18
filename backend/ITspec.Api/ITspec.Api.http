@@ -450,6 +450,58 @@ Content-Type: application/json
 GET {{Api}}/technicians/me/device-types
 Authorization: Bearer {{georgi}}
 
+### ====================== АДМИН ======================
+
+### 52. Потребители от админ -> 200
+GET {{Api}}/admin/users
+Authorization: Bearer {{admin}}
+
+### 53. Потребители от техник -> 403
+GET {{Api}}/admin/users
+Authorization: Bearer {{ivan}}
+
+### 54. Статистика -> 200
+GET {{Api}}/admin/stats
+Authorization: Bearer {{admin}}
+
+### 54.1 Потребители без токен -> 401
+GET {{Api}}/admin/users
+
+### 54.2 Само техниците, които не са блокирани -> 200
+GET {{Api}}/admin/users?role=Technician&blocked=false
+Authorization: Bearer {{admin}}
+
+### 54.3 Админът блокира себе си -> 409
+# Id на админа е 1 (създава се от миграцията с HasData).
+POST {{Api}}/admin/users/1/block
+Authorization: Bearer {{admin}}
+
+### 54.4 Блокиране на несъществуващ -> 404
+POST {{Api}}/admin/users/999999/block
+Authorization: Bearer {{admin}}
+
+### 54.5 Всички заявки, само отворените -> 200
+GET {{Api}}/admin/requests?status=Open
+Authorization: Bearer {{admin}}
+
+### 54.6 Всички заявки от клиент -> 403
+GET {{Api}}/admin/requests
+Authorization: Bearer {{maria}}
+
+### 54.7 Блокиране на Петър -> 204
+POST {{Api}}/admin/users/{{loginPetar.response.body.$.user.userId}}/block
+Authorization: Bearer {{admin}}
+
+### 54.8 Вход на блокирания Петър -> 403
+POST {{Api}}/auth/login
+Content-Type: application/json
+
+{ "email": "petar@itspec.local", "password": "Demo123!" }
+
+### 54.9 Отблокиране -> 204, после входът пак дава 200 (пуснете тест 5)
+POST {{Api}}/admin/users/{{loginPetar.response.body.$.user.userId}}/unblock
+Authorization: Bearer {{admin}}
+
 ### ====================== МОИТЕ ЗАЯВКИ (10б) ======================
 
 ### 55. „Моите“ на Мария -> 200, само нейните, най-новите първи
