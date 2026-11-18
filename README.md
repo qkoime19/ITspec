@@ -656,6 +656,39 @@ Update-Database
 
 ---
 
+
+## Стъпка 10а — каталогът: видове устройства
+
+| Метод | Адрес | Роля | Вход | Изход | Кодове |
+|---|---|---|---|---|---|
+| GET | /api/v1/device-types | всички, вкл. анонимни | — | списък `DeviceTypeDto` (с `requestsCount`) | 200 |
+| GET | /api/v1/device-types/{id} | всички | — | `DeviceTypeDto` | 200, 404 |
+| POST | /api/v1/device-types | Admin | `SaveDeviceTypeDto` | `DeviceTypeDto` | 201 + Location, 400, 403, 409 |
+| PUT | /api/v1/device-types/{id} | Admin | `SaveDeviceTypeDto` | — | 204, 400, 404, 409 |
+| DELETE | /api/v1/device-types/{id} | Admin | — | — | 204, 404 |
+
+**Публичен ли е списъкът?** Да — без него посетителят не може да филтрира обявите на началната страница, а при регистрация техникът избира видове. Админът може да поиска и неактивните с `?includeInactive=true`.
+
+**Меко или твърдо изтриване?** Меко: `DELETE` прави `IsActive = false` с един `UPDATE … WHERE Id = @id AND IsActive = 1`. Към вида сочат заявки и техници (FK с Restrict) — твърдото изтриване би дало грешка 547 или би изтрило историята. Изтритият вид го няма в списъка и в `GET {id}` (404), не може да се избере за нова заявка (400), но старите заявки още показват името му. Повторно `DELETE` → 404. Админът може да го върне с `PUT` и `"isActive": true`.
+
+**Уникално поле:** `Name` — UNIQUE индекс в базата (стъпка 7). Сервизът проверява и с `AnyAsync`, за да върне ясно съобщение; ако двама едновременно минат проверката, индексът хваща втория и `ApiExceptionHandler` връща 409.
+
+**Колко SQL заявки прави списъкът?** Една: `Select(d => new DeviceTypeDto(…, d.SupportRequests.Count))` става `SELECT … (SELECT COUNT(*) …)`. Нищо не се зарежда в паметта.
+
+**Защо Id е 0 преди SaveChanges?** Колоната е IDENTITY — числото го дава SQL Server при INSERT, който EF праща чак в `SaveChangesAsync`. Затова `CreatedAtAction` се вика след него.
+
+### Код
+
+`Controllers/DeviceTypesController.cs` (тънък, `[Authorize(Roles = Admin)]` над класа, `[AllowAnonymous]` на двата GET), `Model/Services/DeviceTypeService.cs`, `View/DTOs/DeviceTypeDtos.cs`. Тестове: `ITspec.Api.http`, 46–48.9.
+
+### Решения
+
+- AI предложи `Include(d => d.SupportRequests)` и `.Count` в паметта → **отхвърлих**: зарежда всички заявки, за да ги преброи.
+- AI предложи твърдо изтриване, ако видът няма заявки → **отхвърлих**: към вида сочат и техниците; меко изтриване е едно правило за всички случаи.
+- Граничният ми случай: нова заявка с изтрит вид → 400 (тест 48.9).
+
+---
+
 ## SQL скриптове (backend/Database)
 
 Таблиците **не се пишат в SSMS**. Те се описват с C# класове (`Model/Entities`) и `AppDbContext`, а EF Core ги създава с миграции (Code First). Тук са SQL скриптовете за четене и проверка.

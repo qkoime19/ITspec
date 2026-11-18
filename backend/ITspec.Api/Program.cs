@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using ITspec.Api.Infrastructure.Auth;
 using ITspec.Api.Infrastructure.Errors;
+using ITspec.Api.Infrastructure.OpenApi;
 using ITspec.Api.Model.Data;
 using ITspec.Api.Model.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -62,7 +63,7 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 // ---------- Контролери и Swagger ----------
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(o => o.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 
 var app = builder.Build();
 

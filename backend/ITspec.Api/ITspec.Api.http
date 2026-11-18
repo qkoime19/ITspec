@@ -90,28 +90,84 @@ Content-Type: application/json
 
 { "fullName": "Тест Техник", "email": "t@itspec.local", "password": "Test123!", "phone": "abc", "city": "Враца" }
 
-### ====================== ВИДОВЕ УСТРОЙСТВА (каталогът, без вход) ======================
+### ====================== ВИДОВЕ УСТРОЙСТВА ======================
 
-### 1. Списък -> 200
+### 46. Публичен списък -> 200
 GET {{Api}}/device-types
 
-### 2. Един запис -> 200
+### 47. Нов вид от клиент -> 403
+POST {{Api}}/device-types
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "name": "Смарт часовник" }
+
+### 46.1 Един вид по id -> 200
 GET {{Api}}/device-types/1
 
-### 3. Несъществуващ -> 404
-GET {{Api}}/device-types/999
+### 46.2 Несъществуващ вид -> 404
+GET {{Api}}/device-types/999999
 
-### 4. Id, което не е число -> 404 (маршрутът {id:int} не съвпада)
+### 46.3 Id, което не е число (/abc) -> 404 (маршрутът {id:int} не съвпада)
 GET {{Api}}/device-types/abc
 
-### 5. Създаване -> 201 + Location към новия запис
+### 46.4 Нов вид с празно име -> 400
 POST {{Api}}/device-types
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "name": "" }
+
+### 46.5 Нов вид с дублирано име (Лаптоп) -> 409
+POST {{Api}}/device-types
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "name": "Лаптоп" }
+
+### 48. Нов вид от админ -> 201 + Location
+# @name newType
+POST {{Api}}/device-types
+Authorization: Bearer {{admin}}
 Content-Type: application/json
 
 { "name": "Смарт часовник {{$randomInt 100 999}}" }
 
-### 6. Празно име -> 400 ([ApiController] валидира DTO-то)
-POST {{Api}}/device-types
+### 48.1 Новият вид по Location -> 200
+GET {{Api}}/device-types/{{newType.response.body.$.deviceTypeId}}
+
+### 48.2 Преименуване от админ -> 204
+PUT {{Api}}/device-types/{{newType.response.body.$.deviceTypeId}}
+Authorization: Bearer {{admin}}
 Content-Type: application/json
 
-{ "name": "" }
+{ "name": "Смарт часовник {{$randomInt 1000 9999}}" }
+
+### 48.3 Преименуване с дублирано име (Смартфон) -> 409
+PUT {{Api}}/device-types/{{newType.response.body.$.deviceTypeId}}
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "name": "Смартфон" }
+
+### 48.4 Преименуване на несъществуващ -> 404
+PUT {{Api}}/device-types/999999
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "name": "Няма го" }
+
+### 48.5 Меко изтриване от клиент -> 403
+DELETE {{Api}}/device-types/{{newType.response.body.$.deviceTypeId}}
+Authorization: Bearer {{maria}}
+
+### 48.6 Меко изтриване от админ -> 204
+DELETE {{Api}}/device-types/{{newType.response.body.$.deviceTypeId}}
+Authorization: Bearer {{admin}}
+
+### 48.7 Повторно изтриване -> 404
+DELETE {{Api}}/device-types/{{newType.response.body.$.deviceTypeId}}
+Authorization: Bearer {{admin}}
+
+### 48.8 Изтритият вид по id -> 404, и го няма в публичния списък (GET /device-types)
+GET {{Api}}/device-types/{{newType.response.body.$.deviceTypeId}}
