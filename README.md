@@ -66,7 +66,7 @@
 
 ```
 ITspec/
-├── Алекс.slnx
+├── ITspec.slnx
 ├── README.md                   цялата документация (този файл)
 ├── backend/
 │   ├── ITspec.Api/
@@ -87,7 +87,7 @@ ITspec/
 
 **Нужно е:** .NET 10 SDK, Visual Studio с „ASP.NET and web development“, SQL Server Express (или LocalDB), SSMS.
 
-0. `git clone https://github.com/qkoime19/ITspec.git` и отворете `Алекс.slnx` във Visual Studio.
+0. `git clone https://github.com/qkoime19/ITspec.git` и отворете `ITspec.slnx` във Visual Studio.
 1. **Connection string.** В `appsettings.json`:
    `"Default": "Server=.\\SQLEXPRESS;Database=ITspec;Trusted_Connection=True;TrustServerCertificate=True"`.
    С LocalDB сменете `Server=` на `(localdb)\\MSSQLLocalDB`. Двойната `\\` е задължителна: в JSON `\` е специален знак.
@@ -585,7 +585,7 @@ UNIQUE (SupportRequestId, TechnicianId); филтриран UNIQUE (SupportReque
 
 | Нещо | Име | Защо |
 |---|---|---|
-| Решение | `Алекс.slnx` | името на папката в училище; не става namespace |
+| Решение | `ITspec.slnx` | същото име като проекта и репото; файлът само изброява проектите |
 | API проект | `backend/ITspec.Api` | става namespace `ITspec.Api` — без интервали и кирилица |
 | База | `ITspec` на `.\SQLEXPRESS` | на моя компютър няма LocalDB, затова SQL Server Express |
 | Папки | `backend/`, `frontend/`, `docs/` | като в демото; `frontend/` е празна до стъпка 11 |
