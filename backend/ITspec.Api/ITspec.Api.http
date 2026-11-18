@@ -146,6 +146,132 @@ Authorization: Bearer {{ivan}}
 GET {{Api}}/requests/{{requestId}}
 Authorization: Bearer {{ivan}}
 
+### ====================== ОФЕРТИ ======================
+
+### 19. Оферта от Иван (Лаптоп е негов вид) -> 201
+# @name offerIvan
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{ivan}}
+Content-Type: application/json
+
+{ "price": 60, "message": "Ще преинсталирам драйверите, гаранция 1 месец." }
+
+### 20. Втора оферта от Иван по същата заявка -> 409
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{ivan}}
+Content-Type: application/json
+
+{ "price": 50 }
+
+### 21. Оферта от Никола -> 201
+# @name offerNikola
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{nikola}}
+Content-Type: application/json
+
+{ "price": 45, "message": "Мога утре." }
+
+### 22. Оферта от Георги (Лаптоп НЕ е негов вид) -> 403
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{georgi}}
+Content-Type: application/json
+
+{ "price": 40 }
+
+### 23. Оферта от клиент -> 403
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "price": 40 }
+
+### 24. Офертите по заявката от собственика -> 200
+GET {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{maria}}
+
+### 25. Офертите по чужда заявка (Петър) -> 404 (чужд запис -> 404, не издаваме, че съществува)
+GET {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{petar}}
+
+### 26. Приемане на оферта по ЧУЖДА заявка (Петър) -> 409, нищо не се променя
+POST {{Api}}/offers/{{offerIvan.response.body.$.offerId}}/accept
+Authorization: Bearer {{petar}}
+
+### 27. Приемане от техник -> 403
+POST {{Api}}/offers/{{offerIvan.response.body.$.offerId}}/accept
+Authorization: Bearer {{ivan}}
+
+### 28. Приемане без токен -> 401
+POST {{Api}}/offers/{{offerIvan.response.body.$.offerId}}/accept
+
+### 29. Приемане на офертата на Иван от собственика -> 200, заявката е Assigned
+POST {{Api}}/offers/{{offerIvan.response.body.$.offerId}}/accept
+Authorization: Bearer {{maria}}
+
+### 30. Втора приета оферта по същата заявка -> 409
+POST {{Api}}/offers/{{offerNikola.response.body.$.offerId}}/accept
+Authorization: Bearer {{maria}}
+
+### 31. Оферта по заявка, която вече е Assigned -> 409
+POST {{Api}}/requests/{{requestId}}/offers
+Authorization: Bearer {{nikola}}
+Content-Type: application/json
+
+{ "price": 30 }
+
+### 32. Детайли за Иван (приетият техник): clientPhone и clientAddress са попълнени -> 200
+GET {{Api}}/requests/{{requestId}}
+Authorization: Bearer {{ivan}}
+
+### 33. Детайли за Никола (офертата му е отхвърлена): clientPhone и clientAddress са null -> 200
+GET {{Api}}/requests/{{requestId}}
+Authorization: Bearer {{nikola}}
+
+### ====================== ЗАВЪРШВАНЕ И ОТЗИВ ======================
+
+### 34. Отзив преди завършване -> 409
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "rating": 5, "comment": "Твърде рано" }
+
+### 35. Завършване от Никола (не е приетият техник) -> 404
+POST {{Api}}/requests/{{requestId}}/complete
+Authorization: Bearer {{nikola}}
+
+### 36. Завършване от Иван -> 204
+POST {{Api}}/requests/{{requestId}}/complete
+Authorization: Bearer {{ivan}}
+
+### 37. Отзив с оценка 7 -> 400
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "rating": 7 }
+
+### 38. Отзив от Петър (чужда заявка) -> 409
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{petar}}
+Content-Type: application/json
+
+{ "rating": 1 }
+
+### 39. Отзив от собственика -> 201, рейтингът на Иван се обновява
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "rating": 5, "comment": "Бързо и професионално." }
+
+### 40. Втори отзив -> 409
+POST {{Api}}/requests/{{requestId}}/review
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "rating": 4 }
+
 ### ====================== ПРЕКРАТЯВАНЕ ======================
 
 ### 42. Нова заявка за прекратяване -> 201
@@ -206,6 +332,13 @@ Authorization: Bearer {{maria}}
 Content-Type: application/json
 
 { "deviceTypeId": 5, "title": "Принтерът не печата", "description": "Опит за редакция след прекратяване." }
+
+### 45.2 Редакция на възложена заявка (тази от тест 13, вече Completed) -> 409
+PUT {{Api}}/requests/{{newRequest.response.body.$.supportRequestId}}
+Authorization: Bearer {{maria}}
+Content-Type: application/json
+
+{ "deviceTypeId": 1, "title": "Лаптопът не зарежда", "description": "Опит за редакция след приемане на оферта." }
 
 ### ====================== ВИДОВЕ УСТРОЙСТВА ======================
 
@@ -309,3 +442,13 @@ Authorization: Bearer {{maria}}
 ### 57. „Моите“ от техник -> 403
 GET {{Api}}/requests/mine
 Authorization: Bearer {{ivan}}
+
+### ====================== ОФЕРТИ — ОТТЕГЛЯНЕ (10в) ======================
+
+### 58. Оттегляне на чужда оферта (Георги оттегля офертата на Никола) -> 404
+POST {{Api}}/offers/{{offerNikola.response.body.$.offerId}}/withdraw
+Authorization: Bearer {{georgi}}
+
+### 59. Оттегляне на отхвърлена оферта (Никола, след като е приета офертата на Иван) -> 409
+POST {{Api}}/offers/{{offerNikola.response.body.$.offerId}}/withdraw
+Authorization: Bearer {{nikola}}

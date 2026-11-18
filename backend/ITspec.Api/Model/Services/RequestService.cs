@@ -288,6 +288,48 @@ public class RequestService(AppDbContext db)
         await tx.CommitAsync();
     }
 
+    /// <summary>
+    /// Assigned -> Completed. Само техникът с приетата оферта.
+    /// Проста промяна в една таблица, затова не е процедура: един UPDATE с условие.
+    /// 0 реда: това е моя приета работа, но не е Assigned -> 409; иначе (чужда или няма я) -> 404.
+    /// </summary>
+    public async Task CompleteAsync(int id, int technicianId)
+    {
+        var changed = await db.SupportRequests
+            .Where(r => r.SupportRequestId == id
+                        && r.Status == RequestStatus.Assigned
+                        && r.Offers.Any(o => o.Status == OfferStatus.Accepted && o.TechnicianId == technicianId))
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RequestStatus.Completed));
+
+        if (changed == 0)
+        {
+            var isMyJob = await db.Offers.AnyAsync(o => o.SupportRequestId == id
+                                                        && o.TechnicianId == technicianId
+                                                        && o.Status == OfferStatus.Accepted);
+            throw isMyJob
+                ? AppException.Conflict("Само възложена заявка може да бъде завършена.")
+                : AppException.NotFound("Заявката не съществува.");
+        }
+    }
+
+    /// <summary>
+    /// Отзив: процедурата usp_AddReview проверява правилата и в една транзакция
+    /// записва отзива и обновява рейтинга на техника. ClientId идва от токена.
+    /// </summary>
+    public async Task<ReviewDto> AddReviewAsync(int id, int clientId, CreateReviewDto dto)
+    {
+        // Празен коментар се праща като "" — процедурата го записва като NULL.
+        var comment = dto.Comment?.Trim() ?? string.Empty;
+
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"EXEC dbo.usp_AddReview @SupportRequestId = {id}, @ClientId = {clientId}, @Rating = {dto.Rating}, @Comment = {comment}");
+
+        return await db.Reviews
+            .Where(r => r.SupportRequestId == id)
+            .Select(r => new ReviewDto(r.ReviewId, r.Rating, r.Comment, r.CreatedAt))
+            .SingleAsync();
+    }
+
     public Task<bool> IsInTechnicianDeviceTypesAsync(int technicianId, int deviceTypeId)
     {
         return db.TechnicianDeviceTypes

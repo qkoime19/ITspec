@@ -14,7 +14,7 @@ namespace ITspec.Api.Controllers;
 [ApiController]
 [Route("api/v1/requests")]
 [Authorize]
-public class RequestsController(RequestService requests) : ControllerBase
+public class RequestsController(RequestService requests, OfferService offers) : ControllerBase
 {
     /// <summary>Списък според ролята.</summary>
     [HttpGet]
@@ -86,4 +86,38 @@ public class RequestsController(RequestService requests) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Завършване. 204 / 404 (не е твоя работа) / 409 (не е Assigned).</summary>
+    [HttpPost("{id:int}/complete")]
+    [Authorize(Roles = Roles.Technician)]
+    public async Task<IActionResult> Complete(int id)
+    {
+        await requests.CompleteAsync(id, User.GetUserId());
+        return NoContent();
+    }
+
+    /// <summary>Отзив. 201 / 400 (оценка) / 409 (не е Completed, чужда заявка, вече има отзив).</summary>
+    [HttpPost("{id:int}/review")]
+    [Authorize(Roles = Roles.Client)]
+    public async Task<ActionResult<ReviewDto>> Review(int id, CreateReviewDto dto)
+    {
+        var review = await requests.AddReviewAsync(id, User.GetUserId(), dto);
+        return StatusCode(StatusCodes.Status201Created, review);
+    }
+
+    /// <summary>Офертите по заявка. Само собственикът и Admin.</summary>
+    [HttpGet("{id:int}/offers")]
+    [Authorize(Roles = Roles.Client + "," + Roles.Admin)]
+    public async Task<ActionResult<List<OfferDto>>> GetOffers(int id)
+    {
+        return Ok(await offers.GetForRequestAsync(id, User.GetUserId(), User.GetRole()));
+    }
+
+    /// <summary>Нова оферта. 201 / 403 (чужд вид устройство) / 409 (не е Open или вече има оферта).</summary>
+    [HttpPost("{id:int}/offers")]
+    [Authorize(Roles = Roles.Technician)]
+    public async Task<ActionResult<OfferDto>> CreateOffer(int id, CreateOfferDto dto)
+    {
+        var offer = await offers.CreateAsync(id, User.GetUserId(), dto);
+        return StatusCode(StatusCodes.Status201Created, offer);
+    }
 }
